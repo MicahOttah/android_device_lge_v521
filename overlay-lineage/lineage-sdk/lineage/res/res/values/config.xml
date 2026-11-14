@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2017-2018 The LineageOS Project
+     Licensed under the Apache License, Version 2.0
+-->
+<!-- 15.1: these moved from frameworks/base and vendor/cmsdk into lineage-sdk -->
+<resources>
+    <!-- Hardware keys present on the device, stored as a bit field.
+         This integer should equal the sum of the corresponding value for each
+         of the following keys present:
+             1 - Home
+             2 - Back
+             4 - Menu
+             8 - Assistant (search)
+            16 - App switch
+            32 - Camera
+            64 - Volume rocker
+         For example, a device with Home, Back and Menu keys would set this
+         config to 7. -->
+    <integer name="config_deviceHardwareKeys">64</integer>
+    <!-- Hardware keys present on the device with the ability to wake, stored as a bit field.
+         This integer should equal the sum of the corresponding value for each
+         of the following keys present:
+             1 - Home
+             2 - Back
+             4 - Menu
+             8 - Assistant (search)
+            16 - App switch
+            32 - Camera
+            64 - Volume rocker
+         For example, a device with Home, Back and Menu keys would set this
+         config to 7. -->
+    <integer name="config_deviceHardwareWakeKeys">64</integer>
+    <!-- Control the behavior when the user long presses the app switch button.
+            0 - Nothing
+            1 - Menu key
+            2 - Recent apps view in SystemUI
+            3 - Launch assist intent
+            4 - Voice Search
+            5 - In-app Search
+         This needs to match the constants in
+         policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+    -->
+    <integer name="config_longPressOnAppSwitchBehavior">1</integer>
+    <!-- Corresponds to color balance level of zero, this is the native
+         display temperature -->
+    <integer name="config_dayColorTemperature">7400</integer>
+    <integer name="config_nightColorTemperature">3500</integer>
+    <!-- Turn on LiveDisplay auto mode by default -->
+    <integer name="config_defaultLiveDisplayMode">2</integer>
+
+    <!-- Device key handlers: LineageParts touchscreen gestures (the default) plus
+         the side QuickButton handler from device/lge/v521/QuickButton -->
+    <string-array name="config_deviceKeyHandlerLibs" translatable="false">
+        <item>/system/priv-app/LineageParts/LineageParts.apk</item>
+        <item>/system/priv-app/QuickButton/QuickButton.apk</item>
+    </string-array>
+    <string-array name="config_deviceKeyHandlerClasses" translatable="false">
+        <item>org.lineageos.lineageparts.gestures.KeyHandler</item>
+        <item>org.lineageos.settings.quickbutton.KeyHandler</item>
+    </string-array>
+</resources>

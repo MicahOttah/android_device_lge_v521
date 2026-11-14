@@ -42,7 +42,6 @@ TARGET_2ND_CPU_ABI2 := armeabi
 TARGET_2ND_CPU_VARIANT := cortex-a53
 
 TARGET_BOARD_SUFFIX := _64
-TARGET_USES_64_BIT_BINDER := true
 else
 TARGET_ARCH := arm
 TARGET_ARCH_VARIANT := armv7-a-neon
@@ -53,6 +52,10 @@ TARGET_CPU_VARIANT := cortex-a53
 TARGET_BOARD_SUFFIX := _32
 endif
 
+# Android 8.0+ HIDL requires the 64-bit binder protocol, also on this 32-bit kernel
+# (kernel: CONFIG_ANDROID_BINDER_IPC_32BIT is not set)
+TARGET_USES_64_BIT_BINDER := true
+
 # Bootloader
 TARGET_BOOTLOADER_BOARD_NAME := MSM8952
 TARGET_NO_BOOTLOADER := true
@@ -60,15 +63,21 @@ TARGET_NO_BOOTLOADER := true
 # Kernel
 BOARD_KERNEL_BASE := 0x80000000
 BOARD_KERNEL_CMDLINE := androidboot.hardware=qcom msm_rtb.filter=0x237 ehci-hcd.park=3 androidboot.bootdevice=7824900.sdhci lpm_levels.sleep_disabled=1
+# TEMPORARY bring-up: SELinux permissive until the HIDL sepolicy is complete
+BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
 BOARD_KERNEL_PAGESIZE := 2048
 BOARD_KERNEL_TAGS_OFFSET := 0x00000100
 BOARD_RAMDISK_OFFSET     := 0x01000000
 TARGET_KERNEL_SOURCE := kernel/lge/msm8952
-TARGET_KERNEL_APPEND_DTB := true
+# TARGET_KERNEL_APPEND_DTB: deprecated in 15.1; BOARD_KERNEL_IMAGE_NAME := zImage-dtb does the same
 TARGET_KERNEL_CONFIG := lineageos_v521_defconfig
 ifeq ($(FORCE_64_BIT),true)
 TARGET_KERNEL_ARCH := arm64
 TARGET_KERNEL_HEADER_ARCH := arm64
+BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb
+else
+TARGET_KERNEL_ARCH := arm
+BOARD_KERNEL_IMAGE_NAME := zImage-dtb
 endif
 
 # Audio
@@ -85,13 +94,16 @@ BOARD_HAVE_BLUETOOTH_QCOM := true
 BLUETOOTH_HCI_USE_MCT := true
 
 # CMHW
-BOARD_HARDWARE_CLASS += hardware/cyanogen/cmhw
-BOARD_HARDWARE_CLASS += $(DEVICE_PATH)/cmhw
+# Lineage hardware (stock classes come from hardware/lineage/lineagehw/src)
+BOARD_HARDWARE_CLASS += $(DEVICE_PATH)/lineagehw
 BOARD_USES_CYANOGEN_HARDWARE := true
 
 # CPUSets
 ENABLE_CPUSETS := true
 ENABLE_SCHEDBOOST := true
+
+# HIDL
+DEVICE_MANIFEST_FILE := $(DEVICE_PATH)/manifest.xml
 
 # Display
 BOARD_USES_ADRENO := true
@@ -148,7 +160,21 @@ BOARD_USES_QCOM_HARDWARE := true
 BOARD_USES_QC_TIME_SERVICES := true
 
 # Recovery
-TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/rootdir/etc/fstab.qcom
+# 15.1: boot fstab.qcom omits /system (first-stage mount owns it); recovery/OTA need it
+TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery.fstab
+
+# TWRP (WITH_TWRP=true, see bin/build-twrp): TWRP parses the fstab in its own
+# column order, so it needs a TWRP-format fstab instead of the AOSP one.
+# The TWRP bits are kept in their own repository
+# (github.com/MicahOttah/android_device_lge_v521_twrp); clone them into
+# device/lge/v521/ to build a TWRP image from this tree.
+ifeq ($(WITH_TWRP),true)
+  ifeq ($(wildcard $(DEVICE_PATH)/twrp.mk),)
+    $(error TWRP build requested but $(DEVICE_PATH)/twrp.mk is missing - clone https://github.com/MicahOttah/android_device_lge_v521_twrp into device/lge/v521/)
+  endif
+  TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/twrp.fstab
+  include $(DEVICE_PATH)/twrp.mk
+endif
 
 # RIL
 TARGET_RIL_VARIANT := caf

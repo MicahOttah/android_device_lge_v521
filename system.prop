@@ -97,3 +97,6 @@ persist.timed.enable=true
 
 # Wi-Fi
 wifi.interface=wlan0
+
+# 15.1: multihal is built as sensors.$(TARGET_DEVICE); point the HAL loader at it
+ro.hardware.sensors=v521

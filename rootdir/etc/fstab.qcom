@@ -27,7 +27,9 @@
 
 # src                                                               mnt_point	fstype  mnt_flags			                                            fs_mgr_flags
 
-/dev/block/bootdevice/by-name/system                                /system     ext4    ro,barrier=1,noatime                                            wait
+# 8.1: /system is mounted by first-stage (early) mount from the device tree;
+# listing it here makes mount_all fail with EBUSY -> no "nonencrypted" -> no zygote.
+#/dev/block/bootdevice/by-name/system                                /system     ext4    ro,barrier=1,noatime                                            wait
 /dev/block/bootdevice/by-name/userdata                              /data       ext4    nosuid,nodev,barrier=1,noatime,noauto_da_alloc,errors=continue  wait,check,encryptable=/dev/block/bootdevice/by-name/encrypt
 /dev/block/bootdevice/by-name/boot                                  /boot       emmc    defaults                                                        defaults
 /dev/block/bootdevice/by-name/recovery                              /recovery   emmc    defaults                                                        defaults

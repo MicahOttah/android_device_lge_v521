@@ -62,6 +62,9 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml \
     frameworks/native/data/etc/tablet_core_hardware.xml:system/etc/permissions/tablet_core_hardware.xml
 
+# HIDL HALs (LineageOS 15.1)
+$(call inherit-product, $(LOCAL_PATH)/hidl.mk)
+
 # Audio
 PRODUCT_PACKAGES += \
     audiod \
@@ -78,9 +81,9 @@ PRODUCT_PACKAGES += \
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/audio/audio_effects.conf:system/vendor/etc/audio_effects.conf \
-    $(LOCAL_PATH)/audio/audio_platform_info.xml:system/etc/audio_platform_info.xml \
+    $(LOCAL_PATH)/audio/audio_platform_info.xml:system/vendor/etc/audio_platform_info.xml \
     $(LOCAL_PATH)/audio/audio_policy.conf:system/etc/audio_policy.conf \
-    $(LOCAL_PATH)/audio/mixer_paths.xml:system/etc/mixer_paths.xml
+    $(LOCAL_PATH)/audio/mixer_paths.xml:system/vendor/etc/mixer_paths.xml
 
 # Camera
 PRODUCT_PACKAGES += \
@@ -112,6 +115,18 @@ PRODUCT_PACKAGES += \
 # Gestures
 PRODUCT_PACKAGES += \
     GestureHandler
+
+# Side QuickButton (gpio-keys hot_key)
+# The app is developed in its own repository
+# (github.com/MicahOttah/android_app_QuickButton).  Clone it into
+# device/lge/v521/QuickButton to include it in the build; without it the
+# device tree still builds, the app is just left out.
+ifeq ($(wildcard $(LOCAL_PATH)/QuickButton/Android.mk),)
+    $(warning QuickButton not found in $(LOCAL_PATH)/QuickButton - skipping the side QuickButton app. Clone https://github.com/MicahOttah/android_app_QuickButton into $(LOCAL_PATH)/QuickButton to enable it.)
+else
+PRODUCT_PACKAGES += \
+    QuickButton
+endif
 
 # Init
 PRODUCT_PACKAGES += \
@@ -197,10 +212,10 @@ PRODUCT_PACKAGES += \
 
 # Sensors
 PRODUCT_PACKAGES += \
-    sensors.msm8952
+    sensors.v521
 
 PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/configs/sensors/hals.conf:system/etc/sensors/hals.conf \
+    $(LOCAL_PATH)/configs/sensors/hals.conf:system/vendor/etc/sensors/hals.conf \
     $(LOCAL_PATH)/configs/sensors/sensor_def_b3.conf:system/etc/sensors/sensor_def_common.conf \
     $(LOCAL_PATH)/configs/sensors/sensor_def_b3_tmo_us.conf:system/etc/sensors/sensor_def_variable.conf
 

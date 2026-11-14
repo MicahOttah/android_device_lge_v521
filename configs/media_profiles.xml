@@ -443,10 +443,8 @@
         minSampleRate="8000" maxSampleRate="8000"
         minChannels="1" maxChannels="1" />
 
-    <AudioEncoderCap name="lpcm" enabled="true"
-        minBitRate="768000" maxBitRate="4608000"
-        minSampleRate="48000" maxSampleRate="48000"
-        minChannels="1" maxChannels="6" />
+    <!-- 15.1: "lpcm" removed; 8.1 MediaProfiles has no such encoder and
+         CHECK(codec != -1) aborts android.process.media. -->
 
     <!--
         FIXME:
