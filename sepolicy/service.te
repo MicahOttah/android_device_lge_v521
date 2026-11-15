@@ -1,0 +1,13 @@
+# CAF declares the vendor service types that talk to the legacy
+# servicemanager with the vndservice_manager_type attribute, which is
+# only understood by vndservicemanager (it reads vndservice_contexts).
+#
+# The legacy servicemanager, the one that actually runs on this device,
+# reads plat_service_contexts + nonplat_service_contexts and
+# system/sepolicy/tools/checkfc refuses a service_contexts entry whose
+# type does not carry the service_manager_type attribute
+# (CHECK_SC_ASSERT_ATTRS in checkfc.c).  Add it here so the entries in
+# service_contexts are accepted and the pre-existing CAF rules that
+# reference per_mgr_service / qseeproxy_service keep working.
+typeattribute per_mgr_service service_manager_type;
+typeattribute qseeproxy_service service_manager_type;

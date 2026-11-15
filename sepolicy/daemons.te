@@ -1,0 +1,134 @@
+# Rules for the CAF vendor daemons that run on this device.
+#
+# Everything in here was derived from the avc denials collected in
+# boot-logs/boot12-logcat.txt (94 unique denial tuples) after the
+# daemon domain transitions were fixed - see
+# notes/2026-11-16-selinux-daemon-domains.md.
+#
+# Note that this device is not a full treble device, so the
+# "core <-> vendor socket" neverallows in
+# system/sepolicy/public/domain.te (full_treble_only) do not apply.
+
+# --- cnd (connectivity daemon) -------------------------------------------
+# cnd runs as the "cnd" user and has to change ownership of the CNE
+# data files and use raw sockets.
+allow cnd self:capability { chown dac_override fsetid net_raw setgid setuid };
+
+# --- qmuxd ---------------------------------------------------------------
+# qmuxd talks to the diagnostic device and reads the subsystem names
+# from sysfs.
+allow qmuxd diag_device:chr_file rw_file_perms;
+allow qmuxd sysfs:file r_file_perms;
+
+# --- sensors -------------------------------------------------------------
+# The sensors daemon resolves the name of the Venus subsystem through
+# sysfs.
+allow sensors sysfs:file r_file_perms;
+
+# --- time_daemon ---------------------------------------------------------
+allow time_daemon sysfs:file r_file_perms;
+
+# --- thermal-engine ------------------------------------------------------
+allow thermal-engine sysfs_spmi_dev:dir r_dir_perms;
+allow thermal-engine sysfs_spmi_dev:lnk_file r_file_perms;
+
+# --- netmgrd -------------------------------------------------------------
+# netmgrd hands the network interface over to netd and keeps the
+# interface list in /data/misc/net.
+#
+# Only "write" on the netd socket, not w_file_perms: "append" is
+# forbidden for vendor domains on coredomain sockets.
+allow netmgrd netd_socket:sock_file write;
+r_dir_file(netmgrd, net_data_file);
+
+# --- mm-qcamerad ---------------------------------------------------------
+# The camera HAL creates and removes its own socket below /data/misc.
+allow mm-qcamerad camera_data_file:sock_file { create unlink };
+allow mm-qcamerad sysfs:file r_file_perms;
+
+# The socket itself is labelled camera_socket (the file_contexts entry for
+# /data/misc/camera/cam_socket[1-2]), so the daemon has to be able to
+# remove the socket that was left behind by the previous boot before it
+# can bind its own.  CAF keeps this rule and the matching type transition
+# in its legacy policy, which is not part of this build
+#   device/qcom/sepolicy/legacy-common/mm-qcamerad.te:3-4
+type_transition mm-qcamerad system_data_file:sock_file camera_socket "cam_socket1";
+type_transition mm-qcamerad system_data_file:sock_file camera_socket "cam_socket2";
+allow mm-qcamerad camera_socket:sock_file { create setattr unlink write };
+
+# --- rmt_storage ---------------------------------------------------------
+# rmt_storage writes to the remoteproc shared memory entry
+# /sys/kernel/debug/rmt_storage/rmts.  The entry carries its own label
+# (debugfs_rmt, see sepolicy/file.te and sepolicy/genfs_contexts)
+# because AOSP forbids writing to the generic debugfs label:
+#   neverallow { domain -init -system_server -dumpstate } debugfs:file no_rw_file_perms;
+allow rmt_storage debugfs_rmt:dir search;
+allow rmt_storage debugfs_rmt:file w_file_perms;
+
+# --- rild ----------------------------------------------------------------
+# rild keeps its modem configuration and the ICCID files in
+# /data/misc/radio and creates the sqlite journal (qcril.db-journal)
+# next to them, so it needs the CAF rules for the radio data directory.
+#   device/qcom/sepolicy/common/rild.te:42-43
+allow rild radio_data_file:dir rw_dir_perms;
+allow rild radio_data_file:file create_file_perms;
+
+# The CAF rild binary registers its service with the legacy
+# servicemanager.  CAF has this commented out (common/rild.te:2) but the
+# binary does it, and binder_use() grants exactly the four permissions
+# the servicemanager needs to look the caller's context up.
+binder_use(rild)
+
+# --- ipacm ---------------------------------------------------------------
+# The CAF policy expects the IPA configuration in /data/vendor/ipa, which
+# carries the ipa_vendor_data_file label
+#   device/qcom/sepolicy/common/file_contexts:530
+#   device/qcom/sepolicy/common/ipacm.te:33-34
+# This device keeps it in /data/misc/ipa instead.  The directory is
+# created by init ("mkdir /data/misc/ipa 0700 net_admin net_admin" in
+# init.qcom.rc), and init's make_dir() looks the context up in
+# file_contexts and calls setfscreatecon() before the mkdir(), so the
+# directory gets the ipa_vendor_data_file label from
+# sepolicy/file_contexts.  The pid file inside it inherits the label of
+# the directory, and CAF's ipacm rules then cover it.
+#
+# The directory must not stay on the generic system_data_file label:
+#   neverallow { domain -system_server -system_app -init -installd
+#                -update_engine } system_data_file:file no_w_file_perms;
+# would reject any attempt to write the pid file.
+
+# --- thermal-engine ------------------------------------------------------
+# The thermal socket in /dev/socket has to be created with the
+# thermal_socket label.  CAF keeps that type transition in its legacy
+# policy only; without it the socket inherits the socket_device label of
+# /dev/socket and the daemon is not allowed to create it.
+type_transition thermal-engine socket_device:sock_file thermal_socket;
+
+# --- netmgrd -------------------------------------------------------------
+# CAF's libdsutils.so runs the absolute path /system/bin/ifconfig.  On
+# this device /system/bin/ifconfig is the symlink to the AOSP toybox
+# (toolbox_exec); CAF expects the vendor toybox (vendor_toolbox_exec),
+# which netmgrd is allowed to execute (common/netmgrd.te:86).
+#
+# The AOSP escape hatch for vendor domains that execute platform files
+# is used here.  It only lifts the neverallow
+#   neverallow { domain -coredomain -appdomain -rild
+#                -vendor_executes_system_violators }
+#              { exec_type -vendor_file_type ... }:file { entrypoint execute execute_no_trans };
+# for this one domain; rx_file_perms contains no write permission, so
+# the "only recovery may write to /system and /vendor" neverallow is not
+# affected.
+typeattribute netmgrd vendor_executes_system_violators;
+allow netmgrd toolbox_exec:file rx_file_perms;
+
+# --- per_mgr / qseeproxy -------------------------------------------------
+# Both daemons register their service with the legacy servicemanager.
+# binder_use() grants the binder call itself and the servicemanager the
+# right to read the caller's context (getpidcon) while it performs the
+# service_manager check.
+binder_use(per_mgr)
+binder_use(qseeproxy)
+
+# --- mm-pp-daemon --------------------------------------------------------
+# The display daemon publishes the cable version it detected.
+set_prop(mm-pp-daemon, system_prop)

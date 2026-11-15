@@ -1,0 +1,47 @@
+# Rules for the framework side of the vendor stack.
+#
+# Derived from the avc denials in boot-logs/boot12-logcat.txt.
+#
+# Note that this device is not a full treble device, so the
+# "core <-> vendor socket" neverallows in
+# system/sepolicy/public/domain.te (full_treble_only) do not apply.
+
+# --- sensors HAL ---------------------------------------------------------
+# The sensors HAL talks to the CAF sensors daemon over the
+# /dev/socket/sensor_ctl_socket socket.
+allow hal_sensors_default sensors_socket:sock_file write;
+allow hal_sensors_default sensors:unix_stream_socket connectto;
+
+# /dev/sensors is the character device the CAF sensor stack exposes
+# (labelled sensors_device by the platform file_contexts).  The HAL only
+# does a stat() on it before opening it, so it needs getattr.
+allow hal_sensors_default sensors_device:chr_file getattr;
+
+# --- camera --------------------------------------------------------------
+# cameraserver writes to the "thermal-send-client" socket that the
+# vendor camera stack publishes in /dev/socket.
+allow cameraserver socket_device:sock_file write;
+
+# --- audio ---------------------------------------------------------------
+allow audioserver sysfs:dir r_dir_perms;
+
+# --- connectivity --------------------------------------------------------
+# The CNE receiver (dataservice_app) talks to the cnd daemon over the
+# /dev/socket/cnd socket.
+allow dataservice_app cnd_socket:sock_file write;
+allow dataservice_app cnd:unix_stream_socket connectto;
+
+# --- adb shell -----------------------------------------------------------
+# init.qcom.rc exports
+#   PATH=/system/vendor/bin:/sbin:/system/sbin:/system/bin:/system/xbin:/vendor/bin:/vendor/xbin
+# globally, so adbd passes it on to the adb shell.  The shell therefore
+# resolves the vendor toybox (/system/vendor/bin/toybox_vendor, labelled
+# vendor_toolbox_exec) before the AOSP one, and needs to be able to
+# execute it.
+#
+# The platform rule that forbids this
+#   neverallow { coredomain -init -modprobe }
+#             vendor_toolbox_exec:file { entrypoint execute execute_no_trans };
+# sits inside full_treble_only(), and PRODUCT_FULL_TREBLE is not set
+# for this device, so it is not part of the built policy.
+allow shell vendor_toolbox_exec:file rx_file_perms;

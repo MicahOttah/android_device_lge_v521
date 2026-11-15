@@ -1,4 +1,4 @@
-#!/system/bin/sh
+#!/system/vendor/bin/sh
 # Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,7 @@ serialno="$2"
 btsoc=""
 
 # No path is set up at this point so we have to do it here.
-PATH=/sbin:/system/sbin:/system/bin:/system/xbin
+PATH=/system/vendor/bin:/sbin:/system/sbin:/system/bin:/system/xbin
 export PATH
 
 # Trigger WCNSS platform driver
@@ -503,4 +503,4 @@ case "$target" in
 esac
 
 # Run audio init script
-/system/bin/sh /system/etc/init.qcom.audio.sh "$target" "$btsoc"
+/system/vendor/bin/sh /system/etc/init.qcom.audio.sh "$target" "$btsoc"

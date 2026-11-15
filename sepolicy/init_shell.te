@@ -1,0 +1,27 @@
+# Rules for the init shell scripts.
+#
+# The scripts in device/lge/v521/rootdir/etc/*.sh are started by init
+# through /system/vendor/bin/sh, which makes CAF's
+#
+#   domain_auto_trans(init, vendor_shell_exec, qti_init_shell)
+#
+# fire, so they run in the qti_init_shell domain instead of staying in
+# the init domain (AOSP's domain_trans(init, shell_exec, shell) grants
+# permissions but adds no type_transition, and
+# neverallow init { file_type fs_type }:file execute_no_trans; stops
+# init from executing /system/bin/sh at all).
+#
+# See notes/2026-11-16-selinux-daemon-domains.md.
+
+# init creates the pipe it uses to redirect the output of the commands
+# it runs (fork_execve_and_wait_for_completion in
+# system/core/init/init.cpp).  The pipe is created in the init domain,
+# so the script inherits a file labelled init and needs access to it.
+allow qti_init_shell init:fifo_file { getattr read write };
+
+# The helper scripts below /system/etc are labelled system_file.  CAF
+# only grants execute_no_trans on system_file for this domain, which is
+# not enough to read a shell script.  (The scripts that live in the
+# ramdisk are labelled rootfs and CAF already grants
+# r_dir_file(qti_init_shell, rootfs).)
+allow qti_init_shell system_file:file r_file_perms;

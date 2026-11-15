@@ -1,0 +1,18 @@
+# Properties that the init scripts (qti_init_shell domain) write.
+#
+# Both of them land in the plat catch-all "default_prop" without these
+# entries, and
+#
+#   neverallow { domain -init } default_prop:property_service set;
+# (system/sepolicy/public/domain.te) forbids every domain except init
+# from setting default_prop.  CAF already grants qti_init_shell the
+# matching set_prop() rules, the property_contexts entry is what makes
+# them apply to the right property.
+#
+# ro.sf.lcd_density is set by init.qcom.early_boot.sh for msm8952.
+ro.sf.lcd_density                             u:object_r:sf_lcd_density_prop:s0
+
+# ctl.msm_irqbalance is started by init.qcom.sh.  It maps to
+# ctl_default_prop through the plat "ctl." catch-all, which the
+# init scripts are not allowed to write.
+ctl.msm_irqbalance                            u:object_r:msm_irqbalance_prop:s0

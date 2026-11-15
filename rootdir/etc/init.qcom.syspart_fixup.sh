@@ -1,4 +1,4 @@
-#!/system/bin/sh
+#!/system/vendor/bin/sh
 # Copyright (c) 2012, The Linux Foundation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@ target="$1"
 serial="$2"
 
 # No path is set up at this point so we have to do it here.
-PATH=/sbin:/system/sbin:/system/bin:/system/xbin
+PATH=/system/vendor/bin:/sbin:/system/sbin:/system/bin:/system/xbin
 export PATH
 
 mount_needed=false;
@@ -52,22 +52,22 @@ fi
 
 # Run modem link script
 if [ -f /system/etc/init.qcom.modem_links.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.modem_links.sh
+  /system/vendor/bin/sh /system/etc/init.qcom.modem_links.sh
 fi
 
 # Run mdm link script
 if [ -f /system/etc/init.qcom.mdm_links.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.mdm_links.sh
+  /system/vendor/bin/sh /system/etc/init.qcom.mdm_links.sh
 fi
 
 # Run wifi script
 if [ -f /system/etc/init.qcom.wifi.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.wifi.sh "$target" "$serial"
+  /system/vendor/bin/sh /system/etc/init.qcom.wifi.sh "$target" "$serial"
 fi
 
 # Run the sensor script
 if [ -f /system/etc/init.qcom.sensor.sh ]; then
-  /system/bin/sh /system/etc/init.qcom.sensor.sh
+  /system/vendor/bin/sh /system/etc/init.qcom.sensor.sh
 fi
 
 touch /system/etc/boot_fixup

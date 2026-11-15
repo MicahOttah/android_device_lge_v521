@@ -1,1 +1,13 @@
 type sysfs_gesture, fs_type, sysfs_type;
+
+# The remoteproc shared memory debugfs entry that rmt_storage writes to.
+#
+# AOSP forbids generic debugfs access:
+#   neverallow { domain -init -system_server -dumpstate } debugfs:file no_rw_file_perms;
+# (system/sepolicy/public/domain.te), so the entry needs a label of its
+# own.  CAF does the same thing in
+# device/qcom/sepolicy/legacy-common/file.te, but that tree is not part
+# of this build, so the type is declared here.
+#
+# See sepolicy/genfs_contexts for the genfscon that applies it.
+type debugfs_rmt, debugfs_type, fs_type;

@@ -1,2 +1,6 @@
 allow init sensors_data_file:dir mounton;
 allow init persist_drm_file:dir mounton;
+
+# init resolves the sensor device nodes with a stat() before handing
+# them over to the sensors daemon.
+allow init sensors_device:chr_file getattr;

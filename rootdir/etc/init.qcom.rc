@@ -31,6 +31,17 @@ import init.target.rc
 import init.qcom.factory.rc
 
 on early-init
+    # The vendor shell and the vendor toybox live in /system/vendor/bin.
+    # Put them first on the PATH so that the init scripts and every
+    # service they start resolve their helpers to the vendor copies.
+    #
+    # This has to happen in early-init: init.rc imports this file at
+    # line 9, so this section is parsed (and therefore executed) before
+    # the on init section of init.rc itself, which is what creates the
+    # /vendor symlink.  Using /system/vendor/bin directly avoids the
+    # ordering dependency on that symlink.
+    export PATH /system/vendor/bin:/sbin:/system/sbin:/system/bin:/system/xbin:/vendor/bin:/vendor/xbin
+
     mount debugfs debugfs /sys/kernel/debug
     insmod /sbin/qcrypto_module.ko
     insmod /sbin/qdrbg_module.ko
@@ -57,7 +68,20 @@ on early-boot
     write /sys/kernel/codec_type/boot ${persist.sys.external}
     write /sys/kernel/boot_adsp/boot 1
     chown root audio /sys/kernel/boot_adsp/boot
-    exec u:r:qti_init_shell:s0 -- /init.qcom.early_boot.sh
+    # Run the early boot script through the vendor shell.
+    #
+    # The old form
+    #   exec u:r:qti_init_shell:s0 -- /init.qcom.early_boot.sh
+    # asked for an entrypoint permission on the script itself.  The
+    # script lives in the ramdisk and is labelled rootfs, and
+    #   neverallow * { file_type -exec_type -postinstall_file }:file entrypoint;
+    # (system/sepolicy/public/domain.te) forbids granting entrypoint on
+    # a non exec_type file, so that form can never be satisfied.
+    #
+    # Executing the vendor shell instead lets the normal
+    # type_transition init vendor_shell_exec:process qti_init_shell
+    # apply and the script is then simply read as data.
+    exec /system/vendor/bin/sh /init.qcom.early_boot.sh
 
 on boot
     # 15.1: android.hardware.wifi@1.0-service (user wifi) writes the firmware mode here
@@ -415,12 +439,12 @@ on property:bluetooth.startbtsnoop=true
 on property:bluetooth.startbtsnoop=false
     stop btsnoop
 
-#service qcom-c_core-sh /system/bin/sh /init.qcom.class_core.sh
+#service qcom-c_core-sh /system/vendor/bin/sh /init.qcom.class_core.sh
 #    class core
 #    user root
 #    oneshot
 
-service qcom-c_main-sh /system/bin/sh /init.class_main.sh
+service qcom-c_main-sh /system/vendor/bin/sh /init.class_main.sh
     class main
     user root
     oneshot
@@ -479,13 +503,13 @@ service config_bt_addr /system/bin/btnvtool -O
     group bluetooth radio
     oneshot
 
-service config_bluetooth /system/bin/sh /system/etc/init.qcom.bt.sh "onboot"
+service config_bluetooth /system/vendor/bin/sh /system/etc/init.qcom.bt.sh "onboot"
     class core
     user root
     seclabel u:r:bluetooth_loader:s0
     oneshot
 
-service hciattach /system/bin/sh /system/etc/init.qcom.bt.sh
+service hciattach /system/vendor/bin/sh /system/etc/init.qcom.bt.sh
     class late_start
     user bluetooth
     group bluetooth net_bt_admin
@@ -499,7 +523,7 @@ on property:bluetooth.hciattach=true
 on property:bluetooth.hciattach=false
     setprop bluetooth.status off
 
-service hciattach_ath3k /system/bin/sh /system/etc/init.ath3k.bt.sh
+service hciattach_ath3k /system/vendor/bin/sh /system/etc/init.ath3k.bt.sh
      class late_start
      user bluetooth
      group system bluetooth net_bt_admin misc
@@ -601,7 +625,7 @@ on property:ro.data.large_tcp_window_size=true
 on property:sys.sysctl.tcp_adv_win_scale=*
     write /proc/sys/net/ipv4/tcp_adv_win_scale ${sys.sysctl.tcp_adv_win_scale}
 
-service btwlancoex /system/bin/sh /system/etc/init.qcom.coex.sh
+service btwlancoex /system/vendor/bin/sh /system/etc/init.qcom.coex.sh
     class late_start
     user bluetooth
     group bluetooth net_bt_admin inet net_admin net_raw
@@ -702,7 +726,7 @@ service loc_launcher /system/bin/loc_launcher
     class late_start
     group gps inet net_raw oem_2950 net_admin wifi
 
-service fm_dl /system/bin/sh /system/etc/init.qcom.fm.sh
+service fm_dl /system/vendor/bin/sh /system/etc/init.qcom.fm.sh
     class late_start
     user system
     group system
@@ -725,36 +749,36 @@ on property:drmdiag.load=1
 on property:drmdiag.load=0
     stop drmdiag
 
-service qcom-sh /system/bin/sh /init.qcom.sh
+service qcom-sh /system/vendor/bin/sh /init.qcom.sh
     class late_start
     user root
     oneshot
 
-service sensor-sh /system/bin/sh /init.qcom.sensors.sh
+service sensor-sh /system/vendor/bin/sh /init.qcom.sensors.sh
     class core
     user root
     oneshot
 
-service qcom-post-boot /system/bin/sh /system/etc/init.qcom.post_boot.sh
+service qcom-post-boot /system/vendor/bin/sh /system/etc/init.qcom.post_boot.sh
     class late_start
     user root
     disabled
     oneshot
 
-service qti-testscripts /system/bin/sh /system/etc/init.qcom.testscripts.sh
+service qti-testscripts /system/vendor/bin/sh /system/etc/init.qcom.testscripts.sh
     class late_start
     user root
     disabled
     oneshot
     seclabel u:r:qti-testscripts:s0
 
-service wifi-sdio-on /system/bin/sh /system/etc/init.qcom.sdio.sh
+service wifi-sdio-on /system/vendor/bin/sh /system/etc/init.qcom.sdio.sh
     class late_start
     group wifi inet
     disabled
     oneshot
 
-service wifi-crda /system/bin/sh /system/etc/init.crda.sh
+service wifi-crda /system/vendor/bin/sh /system/etc/init.crda.sh
    class late_start
    user root
    disabled
@@ -801,7 +825,7 @@ service battery_monitor /system/bin/battery_monitor
 # The v521 is single-SIM, so persist.radio.multisim.config is never set and
 # those daemons were never started in the first place.
 
-service usb_uicc_enable /system/bin/sh /system/etc/init.qcom.uicc.sh
+service usb_uicc_enable /system/vendor/bin/sh /system/etc/init.qcom.uicc.sh
     class late_start
     user root
     disabled
@@ -825,7 +849,7 @@ service profiler_daemon /system/bin/profiler_daemon
     group root
     disabled
 
-service hcidump /system/bin/sh /system/etc/hcidump.sh
+service hcidump /system/vendor/bin/sh /system/etc/hcidump.sh
     user bluetooth
     group bluetooth system net_bt_admin net_admin
     disabled
@@ -893,7 +917,7 @@ on property:persist.sys.qlogd=1
 on property:persist.sys.qlogd=0
     stop qlogd
 
-service rootagent /system/bin/sh /system/etc/init.qcom.rootagent.sh
+service rootagent /system/vendor/bin/sh /system/etc/init.qcom.rootagent.sh
     disabled
     oneshot
 on property:persist.sys.rootagent=1
@@ -901,7 +925,7 @@ on property:persist.sys.rootagent=1
 on property:persist.sys.rootagent=0
     stop rootagent
 
-service bms-sh /system/bin/sh /init.qcom.bms.sh
+service bms-sh /system/vendor/bin/sh /init.qcom.bms.sh
     class main
     user root
     oneshot
@@ -966,13 +990,13 @@ service LKCore-rel /system/vendor/bin/LKCore
     group system log oem_2950
 
 # Coresight early boot service
-service cs-early-boot /system/bin/sh /persist/coresight/qdss.agent.sh early-boot /system/etc/init.qcom.debug.sh
+service cs-early-boot /system/vendor/bin/sh /persist/coresight/qdss.agent.sh early-boot /system/etc/init.qcom.debug.sh
     class core
     user root
     oneshot
 
 # Coresight post boot servive
-service cs-post-boot /system/bin/sh /persist/coresight/qdss.agent.sh
+service cs-post-boot /system/vendor/bin/sh /persist/coresight/qdss.agent.sh
     user root
     disabled
     oneshot
