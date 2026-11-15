@@ -18,9 +18,12 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | `MicahOttah/android_device_lge_v521` (this one) | The device tree and the 15.1 port. |
 | `MicahOttah/android_device_lge_v521_twrp` | TWRP build files (`twrp.mk`, `twrp.fstab`, vendor recovery init). Clone into `device/lge/v521/`. |
 | `MicahOttah/android_app_QuickButton` | The side QuickButton app. Clone into `device/lge/v521/QuickButton`. |
+| `MicahOttah/android_hardware_ril` | The CAF branch of the RIL (`lineage-15.1-caf`), with the SIM_IO / signal-strength / data-registration fixes. |
+| `MicahOttah/android_frameworks_base` | The two Android-7.0-era compatibility shims for the stock CNE blobs (`lineage-15.1-v521`). |
+| `MicahOttah/proprietary_vendor_lge` | The v521 blob fixes: the CAF protobuf runtime rename and the removal of the stock CAF `libril.so`. |
 
-Both add-ons are optional: the device tree builds without them and warns what
-is missing.
+The three add-ons are optional: the device tree builds without them and warns
+what is missing.
 
 ## What works
 
@@ -32,61 +35,67 @@ is missing.
   lease, DNS and TLS working.
 * ADB over USB (root, no auth prompt - see *Bring-up settings*).
 * TWRP 3.2.3-0 recovery (built from the tree with `WITH_TWRP=true`).
+* **The radio and mobile data.** The SIM registers on LTE, the EF files are
+  readable, and the data path comes up on `rmnet_data0`:
+
+  ```
+  init.svc.ril-daemon=running
+  mVoiceRegState=0(IN_SERVICE)  mDataRegState=0(IN_SERVICE)  mDataConnectionState=2
+  mRilVoiceRadioTechnology=14(LTE)  mRilDataRadioTechnology=14(LTE)
+  47 EF reads succeed (responseIccIo: e=0)
+  ICCID 8901260026190481359   mcc 310  mnc 260   gsm.operator.numeric=310260
+  gsm.network.type=LTE   gsm.sim.state=READY
+  rmnet_data0: up
+  ```
+
+  Getting there needed three pieces of work, each in its own repository:
+  1. the CAF protobuf runtime has to be renamed so that the CAF blobs and
+     the AOSP ones do not fight over the same symbols, and the CAF blobs
+     must not pull `libmedia.so` back in
+     (`MicahOttah/proprietary_vendor_lge`);
+  2. the HIDL RIL has to hand the vendor the CAF `RIL_SIM_IO` layout and
+     the CAF command numbers, and has to fall back to the voice
+     registration state for the data registration request, which CAF does
+     not implement (`MicahOttah/android_hardware_ril`);
+  3. the vendor blob list must **not** install LG's stock CAF
+     `libril.so` into `/system/lib` - it shadows the LineageOS
+     `hardware/ril-caf` one in `/system/vendor/lib` and the radio daemon
+     then cannot link (`ril_service_name`).
 
 ## What does not work yet
 
-1. **SystemUI crashes when Recents is opened** ("System UI has stopped").
-   The HIDL graphics allocator's *reply* buffer cannot be allocated in
-   SystemUI's address space: the kernel logs
-   `binder: <pid>: binder_alloc_buf, no vma` for the `hwbinder` context,
-   the reply fails with `BR_FAILED_REPLY`, the client sees
-   `EX_TRANSACTION_FAILED` and `GraphicBufferAllocator: Failed to allocate
-   (1008 x 112)`. The `hwbinder` proc of SystemUI has `proc->vma == NULL`
-   while its `/dev/hwbinder` mapping is still present, so
-   `binder_vma_close()` cleared it while `binder_mmap()` never set it
-   again. Reproduces on every boot and right after a `kill -9` of
-   SystemUI, so it is broken from process birth and not caused by
-   something the process does later.
-   A diagnostic kernel with `V521DBG` prints in `binder_open()`,
-   `binder_mmap()`, `binder_vma_close()`, `binder_alloc_buf()` and
-   `binder_update_page_range()` is built and not yet flashed.
-
-2. **The radio and the mobile data are in a crash loop.** Four binaries
-   restart in a loop, so there is no mobile data and no IMS:
-   * `/vendor/bin/hw/rild` - `cannot locate symbol "ril_service_name"`
-   * `/system/bin/cnd` - `cannot locate symbol
-     "google::protobuf::internal::StringTypeHandlerBase::New()" referenced
-     by "/system/vendor/lib/libcne.so"`
-   * `/system/bin/netmgrd` and `/system/bin/imsdatadaemon` - `cannot
-     locate symbol
-     "google::protobuf::io::CodedInputStream::ReadVarint32Fallback(unsigned
-     int*)" referenced by "/system/vendor/lib/libcneapiclient.so"`
-
-   The vendor blobs are from a newer Android than 8.1 and expect a
-   protobuf version that is not in the tree. Needs either matching
-   protobuf blobs or a shim for the three symbols.
-
-3. **SELinux is permissive.** `BoardConfig.mk` adds
+1. **SELinux is permissive.** `BoardConfig.mk` adds
    `androidboot.selinux=permissive` to the kernel cmdline because the
    sepolicy for the HIDL HALs is not complete yet. Enforcing has not been
    attempted; expect `avc: denied` until the policy is filled in.
+   Known gaps: `qmuxd` (`block_suspend`), `netmgrd` (`netlink_route_socket`,
+   socket `ioctl`/`create`), and the init services `qmuxd` and
+   `rmt_storage` have no domain at all.
 
-4. **Sensors are mostly missing.** The sensor HAL enumerates exactly one
-   sensor (`LGE Cap Sensor`); the platform has 27. `sensors.v521` does not
-   load the full sensor list yet.
+2. **One sensor is missing.** The vendor sensor HAL reports *26 h/w
+   sensors, 26 running*; the framework's sensor list has 27 entries
+   (handles `0x01`-`0x1a` plus one with the handle `0x5f67656f`,
+   "GeoMag Rotation Vector Sensor").  The sensor configuration
+   (`/etc/sensors/sensor_def_common.conf`, `sensor_def_variable.conf`) is
+   byte-identical to the stock ROM and the vendor `sensors.qcom` differs
+   from the stock copy only in relocation bytes, so the difference is
+   somewhere else.  The board has no gyroscope fitted (the accelerometer
+   is an STMicroelectronics K2HHTR), which is the most likely candidate.
 
-5. **Camera is untested.** The HIDL camera passthrough is wired up, but no
+3. **Camera is untested.** The HIDL camera passthrough is wired up, but no
    picture has been taken and the legacy `camera.msm8952` blob has not been
    validated on 8.1.
 
-6. **Recovery/OTA are untested.** The stock recovery is built from this
-   tree, but no OTA package has been installed.
+4. **No OTA installed.** The stock recovery is built from this tree, but no
+   OTA package has been installed.
 
-7. **The build fingerprint is not the stock one.** The static stock
-   fingerprint was removed: in 15.1 it only sets `ro.build.fingerprint`
-   and not `ro.vendor.build.fingerprint`, so `Build.isBuildConsistent()`
-   fails and the device shows "There's an internal problem with your
-   device" at boot.
+5. **DPM (`dpmd`) is not installed.** The blobs are not in the tree yet and
+   there is no `dpmd` service, so the device has no device policy manager.
+
+6. **Widevine is not working.** `system/vendor/lib/mediadrm/libwvdrmengine.so`
+   and `system/vendor/lib/mediacas/libclearkeycasplugin.so` are CAF-built
+   and still import the CAF protobuf runtime into a process that also has
+   AOSP's runtime.  Deliberately left alone.
 
 ## Bring-up settings
 
@@ -110,5 +119,11 @@ is missing.
   64-bit binder ABI, which is what Android 8.0+ HIDL needs.
 * A TWRP build in the same output tree installs `init.recovery.*.rc` and
   `file_contexts.bin` into the **boot** ramdisk root
-  (`out/target/product/v521/root`). They have to be removed and the boot
-  ramdisk rebuilt before a ROM image is released.
+  (`out/target/product/v521/root`), and its shared libraries
+  (`libminuitwrp`, `libaosprecovery`, `libgpt_twrp`, ...) into
+  `out/target/product/v521/system/lib`.  They have to be removed and the
+  boot ramdisk rebuilt before a ROM image is released - the build system
+  does **not** prune the outputs of a `PRODUCT_COPY_FILES` entry that was
+  taken out of a `.mk` file, so the stale files are packaged into the
+  system image otherwise.  `bin/clean-twrp-leftovers` and
+  `bin/clean-stale-outputs` in the working directory do this.
