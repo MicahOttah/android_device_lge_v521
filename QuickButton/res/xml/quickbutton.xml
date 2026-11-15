@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <ListPreference
+        android:key="quickbutton_press_action"
+        android:title="@string/press_title"
+        android:dialogTitle="@string/press_title"
+        android:persistent="false" />
+
+    <ListPreference
+        android:key="quickbutton_long_press_action"
+        android:title="@string/long_press_title"
+        android:dialogTitle="@string/long_press_title"
+        android:persistent="false" />
+
+</PreferenceScreen>

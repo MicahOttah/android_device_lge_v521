@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">QuickButton</string>
+    <string name="tile_summary">Choose what the side button opens</string>
+
+    <string name="press_title">Press</string>
+    <string name="long_press_title">Press and hold</string>
+
+    <string name="action_none">Do nothing</string>
+    <string name="action_camera">Camera</string>
+    <string name="action_missing">App not installed</string>
+</resources>
