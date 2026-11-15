@@ -11,3 +11,15 @@ type sysfs_gesture, fs_type, sysfs_type;
 #
 # See sepolicy/genfs_contexts for the genfscon that applies it.
 type debugfs_rmt, debugfs_type, fs_type;
+
+# The Qualcomm DPM configuration files below /system/etc/dpm.
+#
+# dpm.conf holds the Fast Dormancy idle timers and the network masks and
+# is read by libdpmframework.so, which is linked into the dpmd daemon.
+# The OEM policy of this device does not give dpmd any read access to
+# system_file (it only has { execute execute_no_trans getattr } on it), so
+# the config files need a label of their own for the daemon to be able to
+# read them without giving it access to the whole of /system.
+#
+# See sepolicy/dpmd.te and notes/2026-11-16-dpm-nsrm.md.
+type dpm_conf_file, file_type;

@@ -32,7 +32,41 @@ persist.data.netmgrd.qos.enable=true
 persist.data.mode=concurrent
 
 # DPM
-persist.dpm.feature=0
+# The Qualcomm DPM daemon (dpmd) is enabled with this bit mask.  The
+# daemon reads it in DpmConfig::DpmConfig() (libdpmframework.so) and
+# shuts down with "None of the dpm feature enabled, dpmd shutting down"
+# when the mask is zero, so it has to be non-zero for dpmd to run at all.
+#
+#   bit 0 (1)  Fast Dormancy (FD)   - suspends the LTE/UMTS radio while
+#                                     the screen is off and nothing is
+#                                     moving.  Configured by
+#                                     /system/etc/dpm/dpm.conf
+#                                     (dpm_fd_enable_networks_mask).
+#   bit 1 (2)  CTM (Connection Tracking Manager)
+#   bit 2 (4)  NSRM (Network System Resource Manager)
+#   bit 3 (8)  TCM (TCP Connection Manager)
+#
+# The Java side agrees: DpmApi.DPM_CONFIG_FEATURE_MASK_NSRM is 4,
+# DpmApi.DPM_CONFIG_FEATURE_MASK_TCM is 8 and Dpm_ENABLE_PROPERTY_MASK
+# is 15 (see com.qti.dpmapi.DpmApi in dpmapi.jar).
+#
+# NSRM (bit 2) is deliberately left out.  Its native half reads
+# ro.serialno (libdpmnsrm.so), and AOSP protects that property:
+#
+#   neverallow { domain -adbd -dumpstate -hal_drm -hal_cas -init
+#                -mediadrmserver -recovery -shell -system_server }
+#       serialno_prop:file r_file_perms;
+#
+# (system/sepolicy/public/domain.te:451-465)
+#
+# Reading it would either need that neverallow lifted, which AOSP
+# deliberately does not allow, or a hole in it.  NSRM's driver is missing
+# anyway: neither dpmserviceapp.apk nor /vendor/bin/dpmQmiMgr exist in
+# the stock LG ROM for this SoC, so the Java side of NSRM cannot run.
+# See notes/2026-11-16-dpm-nsrm.md.
+#
+# 11 = FD (1) | CTM (2) | TCM (8)
+persist.dpm.feature=11
 
 # Display
 ro.qualcomm.cabl=0

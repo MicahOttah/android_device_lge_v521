@@ -45,6 +45,15 @@
 # and the pid file inside it inherits it.
 /data/misc/ipa(/.*)?                                                u:object_r:ipa_vendor_data_file:s0
 
+# DPM
+#
+# /system/etc/dpm/dpm.conf holds the Fast Dormancy idle timers and the
+# network masks; /system/etc/dpm/nsrm/NsrmConfiguration.xml holds the NSRM
+# gate policy for the (missing) Java service.  The native daemon reads
+# dpm.conf, so the directory and the files get their own type instead of
+# the generic system_file label - see sepolicy/file.te and sepolicy/dpmd.te.
+/system/etc/dpm(/.*)?                                               u:object_r:dpm_conf_file:s0
+
 # Vendor daemons that live in /system/bin
 #
 # The CAF policy in device/qcom/sepolicy labels the vendor daemons with

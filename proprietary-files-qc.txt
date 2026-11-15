@@ -47,19 +47,29 @@ vendor/lib/libvendorconn.so
 vendor/lib/libwqe.so
 vendor/lib/libxml.so
 
-# DPM
-#bin/dpmd
-#etc/permissions/com.qti.dpmframework.xml
-#etc/permissions/dpmapi.xml
-#framework/com.qti.dpmframework.jar
-#framework/dpmapi.jar
-#framework/tcmclient.jar
-#-priv-app/dpmserviceapp/dpmserviceapp.apk
-#vendor/lib/libdpmctmgr.so
-#vendor/lib/libdpmfdmgr.so
-#vendor/lib/libdpmframework.so
-#vendor/lib/libdpmnsrm.so
-#vendor/lib/libdpmtcm.so
+# DPM (Qualcomm NSRM - network suspend/resume)
+#
+# dpmserviceapp.apk is deliberately NOT in this list: the stock LG ROM does
+# not contain it (checked in both lg-stock/system.img and
+# lg-stock-20n/system.img), so there is nothing to extract.  The stock ROM
+# also has no /vendor/bin/dpmQmiMgr, so the IdpmQmi hwservice that the Java
+# side needs does not exist on this device either.  The NSRM policy engine
+# therefore has no driver, but dpmd still does the Fast Dormancy half of
+# the feature, which is driven by etc/dpm/dpm.conf alone.
+# See notes/2026-11-16-dpm-nsrm.md.
+bin/dpmd
+etc/dpm/dpm.conf
+etc/dpm/nsrm/NsrmConfiguration.xml
+etc/permissions/com.qti.dpmframework.xml
+etc/permissions/dpmapi.xml
+framework/com.qti.dpmframework.jar
+framework/dpmapi.jar
+framework/tcmclient.jar
+vendor/lib/libdpmctmgr.so
+vendor/lib/libdpmfdmgr.so
+vendor/lib/libdpmframework.so
+vendor/lib/libdpmnsrm.so
+vendor/lib/libdpmtcm.so
 
 # DRM
 bin/qseecomd

@@ -1,0 +1,240 @@
+# Qualcomm DPM daemon (dpmd).
+#
+# dpmd is the native half of Qualcomm's DPM feature.  On this device it
+# implements "Fast Dormancy" (FD) and the TCM timers, and it provides the
+# socket through which the (missing) NSRM policy engine would tell it
+# which apps to suspend.  See notes/2026-11-16-dpm-nsrm.md.
+#
+# The upstream CAF policy that this tree builds against
+# (device/qcom/sepolicy/private/dpmd.te) is written for the common case
+# and grants dpmd much less than the daemon actually touches.  With only
+# those rules dpmd dies one second into the boot:
+#
+#   avc: denied { read } for comm="dpmd" name="name" dev="sysfs"
+#       scontext=u:r:dpmd:s0 tcontext=u:object_r:sysfs:s0 tclass=file
+#   avc: denied { dac_override } for comm="dpmd" capability=1
+#       scontext=u:r:dpmd:s0 tcontext=u:r:dpmd:s0 tclass=capability
+#
+# The rules below were taken from the policy that LG shipped for this
+# device, which is in the stock boot image:
+#
+#   $ unpack_bootimg --boot_img lg-stock/boot.img --out unpacked
+#   $ zcat unpacked/ramdisk | cpio -idm      # -> sepolicy, file_contexts.bin
+#
+# The OEM policy grants dpmd 111 rules.  They are reproduced here
+# verbatim, except for the targets whose types do not exist in this tree
+# (diagd, ftm_ptt, ckerror_data_file, ctl_dpmd_prop, hf_call_status_prop,
+# minios_prop, powerkeypressed_prop, sys_camera_orientation_prop and
+# redsocks - all of them belong to LG/CAF components that are not part of
+# this port).
+#
+# Note that the OEM never started the daemon either: the stock ROM has no
+# init service for it, so its policy was never exercised.  Starting it is
+# what this port does, so the policy has to actually work.
+
+# --- capabilities --------------------------------------------------------
+# The OEM grants eight:
+#   allow dpmd self:capability {
+#       chown dac_override fsetid net_admin net_raw setgid setuid sys_module
+#   };
+# CAF only grants { net_admin net_raw setuid sys_module }
+# (device/qcom/sepolicy/private/dpmd.te:46-50).  dac_override is what the
+# daemon needs to open the /proc/<pid> entries of apps that are not its
+# own; chown/fsetid/setgid come with the same code path.
+allow dpmd self:capability { chown dac_override fsetid setgid };
+
+# --- sysfs ---------------------------------------------------------------
+# dpmd reads the IOMMU group names out of /sys/kernel/iommu_groups/*/name
+# to find the DMA-capable groups.
+allow dpmd sysfs:dir { getattr ioctl lock open read search };
+allow dpmd sysfs:file { getattr ioctl lock open read };
+allow dpmd sysfs:lnk_file { getattr ioctl lock open read };
+
+# --- its own configuration ------------------------------------------------
+# /system/etc/dpm/dpm.conf holds the Fast Dormancy idle timers and the
+# network masks, and is read by libdpmframework.so, which is linked into
+# dpmd.  It carries its own type so that dpmd can read it without getting
+# read access to all of /system.
+allow dpmd dpm_conf_file:dir { getattr open read search };
+allow dpmd dpm_conf_file:file { getattr ioctl lock open read };
+
+# --- the sockets it owns -------------------------------------------------
+# dpmd creates its companion socket /dev/socket/dpmwrapper, which is the
+# channel the NSRM policy engine would drive it through, and it uses the
+# /dev/socket/dpmd socket that init hands it.
+#
+# The OEM labels the wrapper socket dpmwrapper_socket, but that type is
+# declared in the CAF *platform private* policy
+# (device/qcom/sepolicy/private/file.te:33), which the device policy
+# cannot see: checkpolicy compiles the device (nonplat) policy on its
+# own, so a type that only exists in the platform policy is "unknown"
+# there.
+#
+# The OEM's rules for it are not needed here either.  Android does not
+# apply the file_contexts entry when a process creates a file: a new
+# file inherits the label of the directory it is created in, unless
+# there is a type_transition rule for it.  There is none for
+# dpmwrapper, so the socket that dpmd creates in /dev/socket (which is
+# socket_device) stays socket_device:
+#
+#   $ adb shell ls -lZ /dev/socket/dpmwrapper
+#   srw-rw---- 1 system inet u:object_r:socket_device:s0 0 ... /dev/socket/dpmwrapper
+#
+# (init relabels /dev/socket/dpmd to dpmd_socket itself, it has
+# relabelto for that, which is why only that one has its own label.)
+#
+# Nothing loses from that here: the only consumer of dpmwrapper_socket
+# would be the NSRM service, which does not exist on this device (see
+# notes/2026-11-16-dpm-nsrm.md).
+allow dpmd socket_device:dir { add_name create getattr ioctl lock open read remove_name search write };
+allow dpmd socket_device:sock_file { create getattr read setattr unlink write };
+
+# --- the peers it talks to -----------------------------------------------
+# cnd owns the iptables/ip6tables rules that Fast Dormancy installs, so
+# dpmd hands them over over the cnd socket.
+allow dpmd cnd:unix_stream_socket connectto;
+allow dpmd cnd_socket:sock_file write;
+
+# qmuxd is the RIL multiplexer; dpmd asks it about the radio state.
+allow dpmd qmuxd:unix_stream_socket connectto;
+allow dpmd qmuxd_socket:sock_file { create getattr read setattr unlink write };
+
+# The RIL multiplexer's sockets live in a directory of their own, which the
+# OEM labels qmuxd_socket as well (a directory and a socket file share the
+# label there).  dpmd has to be able to look inside it.
+allow dpmd qmuxd_socket:dir { add_name create getattr ioctl lock open read remove_name rename reparent rmdir search setattr write };
+
+# The daemon walks the app list to find the UIDs whose traffic it is
+# allowed to suspend, so it needs to look at the other daemons.
+allow dpmd appdomain:dir { getattr ioctl lock open read search };
+allow dpmd appdomain:fd use;
+allow dpmd untrusted_app:dir search;
+allow dpmd netd:dir { getattr ioctl lock open read search };
+allow dpmd netd:file { getattr ioctl lock open read };
+allow dpmd netd:fd use;
+allow dpmd mediaserver:dir { getattr ioctl lock open read search };
+allow dpmd mediaserver:file { getattr ioctl lock open read };
+allow dpmd mediaserver:fd use;
+allow dpmd system_server:dir { getattr ioctl lock open read search };
+allow dpmd system_server:file { getattr ioctl lock open read };
+allow dpmd system_server:fd use;
+allow dpmd mtp:dir { getattr ioctl lock open read search };
+allow dpmd mtp:file { getattr ioctl lock open read };
+allow dpmd mtp:fd use;
+allow dpmd drmserver:dir { getattr ioctl lock open read search };
+allow dpmd drmserver:file { getattr ioctl lock open read };
+allow dpmd drmserver:fd use;
+allow dpmd wfdservice:dir { getattr ioctl lock open read search };
+allow dpmd wfdservice:file { getattr ioctl lock open read };
+allow dpmd wfdservice:fd use;
+
+# The DNS forwarders, so that dpmd can see the resolver's state.
+allow dpmd dhcp:dir search;
+allow dpmd dnsmasq:dir search;
+
+# --- the sockets it opens to the outside world ---------------------------
+# The OEM grants dpmd the full set of socket permissions on its own
+# sockets, including the ioctl permission on the generic socket class.
+# Without it the daemon dies with
+#
+#   avc: denied { ioctl } for path="socket:[...]" dev="sockfs"
+#       ioctlcmd=c302 scontext=u:r:dpmd:s0 tcontext=u:r:dpmd:s0
+#       tclass=socket permissive=0
+#
+# The ioctls in question are the Qualcomm IPC Router ones: dpmd talks to
+# the RIL over a QRTR/IPC router socket and has to look the server up
+# and bind its control port.  They are
+#
+#   0xc302  IPC_ROUTER_IOCTL_LOOKUP_SERVER
+#   0xc304  IPC_ROUTER_IOCTL_BIND_CONTROL_PORT
+#
+# (kernel/lge/msm8952/include/uapi/linux/msm_ipc.h; the names are taken
+# from device/qcom/sepolicy/common/ioctl_defines.)
+#
+# AOSP has
+#
+#   neverallowxperm domain domain:socket_class_set ioctl { 0 };
+#
+# (system/sepolicy/public/domain.te:230), and that neverallow is
+# stricter than it looks: libsepol treats a plain "ioctl" grant as a
+# grant of *every* ioctl number, so it also covers the forbidden number
+# 0 and the rule is rejected:
+#
+#   neverallowxperm on line 230 of system/sepolicy/public/domain.te
+#   (or line 8671 of policy.conf) violated by
+#   allow dpmd dpmd:socket { ioctl };
+#
+# The ioctl numbers therefore have to be listed one by one, which is
+# what the allowxperm rules below do.  (The neverallow is only checked
+# when the policy is compiled to a binary, i.e. for the recovery policy
+# and in the final merge of plat + device policy - not in the plain
+# device policy build, which is why this only shows up in a full ROM
+# build.)
+#
+# Both parts are needed: the kernel checks the plain "ioctl" permission
+# of the class *and* the ioctl number (security/selinux/hooks.c,
+# ioctl_has_perm() -> avc_has_extended_perms()), so a rule that only
+# lists the ioctl numbers still gets denied.  The plain grant is only
+# accepted by the neverallow because an allowxperm rule for the same
+# source/target/class exists - libsepol then compares the ioctl numbers
+# instead of the blanket permission.
+allow dpmd self:socket { append bind connect create getattr getopt ioctl lock read setattr setopt shutdown write };
+allowxperm dpmd self:socket ioctl { IPC_ROUTER_IOCTL_LOOKUP_SERVER IPC_ROUTER_IOCTL_BIND_CONTROL_PORT };
+
+# The rmnet ("Qualcomm mobile data modem") socket.  Fast Dormancy
+# installs its per-UID filter rules through it, with the extended rmnet
+# ioctl:
+#
+#   0x89fd  RMNET_IOCTL_EXTENDED
+#
+# (kernel/lge/msm8952/include/uapi/linux/msm_rmnet.h; the sub-command
+# that carries the filter rule is an argument of the ioctl, not part of
+# the number, so the number is all the policy has to know.)
+#
+# The socket is a SOCK_DGRAM socket, so SELinux puts it in the
+# udp_socket class.  The udp_socket class already has a domain wide
+# allowxperm rule (system/sepolicy/public/domain.te:203), which is why
+# the plain ioctl permission below is accepted; the 0x89fd number is
+# added on top of that whitelist.
+allow dpmd self:udp_socket { append bind connect create getattr getopt ioctl lock read setattr setopt shutdown write };
+allowxperm dpmd self:udp_socket ioctl { 0x000089fd };
+
+allow dpmd self:tcp_socket { accept append bind connect create getattr getopt ioctl listen lock read setattr setopt shutdown write };
+allow dpmd self:unix_stream_socket { accept append bind connect connectto create getattr getopt ioctl listen lock read setattr setopt shutdown write };
+allow dpmd self:unix_dgram_socket { append bind connect create getattr getopt ioctl lock read sendto setattr setopt shutdown write };
+allow dpmd self:netlink_socket { append bind connect create getattr getopt lock read setattr setopt shutdown write };
+allow dpmd self:netlink_route_socket { append bind connect create getattr getopt lock nlmsg_read read setattr setopt shutdown write };
+allow dpmd self:netlink_generic_socket { append bind connect create getattr getopt lock read setattr setopt shutdown write };
+
+# --- the sockets of the other daemons ------------------------------------
+# Fast Dormancy and TCM decide whether a connection may be suspended by
+# looking at the sockets that are open, so dpmd needs to be able to
+# inspect the TCP connections of the daemons and of the apps.  These are
+# the OEM's peer rules; without them dpmd cannot see the traffic it is
+# supposed to gate.
+allow dpmd netd:tcp_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+allow dpmd mediaserver:tcp_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+allow dpmd mtp:tcp_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+allow dpmd drmserver:tcp_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+allow dpmd wfdservice:tcp_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+allow dpmd appdomain:tcp_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+allow dpmd appdomain:udp_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+allow dpmd untrusted_app:unix_stream_socket { append bind connect getattr getopt ioctl lock read setattr setopt shutdown write };
+
+# The property service, for the DPM properties it reads and writes.
+allow dpmd property_socket:sock_file write;
+allow dpmd system_prop:property_service set;
+allow dpmd ctl_default_prop:property_service set;
+
+# --- the files it writes -------------------------------------------------
+# dpmd writes its own /proc/sys/net state.  Its scratch area in tmpfs is
+# covered by the tmpfs_domain() macro that init_daemon_domain(dpmd) pulls
+# in (system/sepolicy/public/te_macros:77-81), which already declares
+# dpmd_tmpfs and grants the read/write access.
+allow dpmd proc_net:file write;
+
+# init has to be told that the daemon died.
+allow dpmd init:process sigchld;
+
+# The OEM lets dpmd run things out of the root filesystem.
+allow dpmd rootfs:file execute;
