@@ -77,13 +77,28 @@ CONSUMERS = [
     ("vendor/lib/libwqe.so", "lite"),
     ("vendor/lib/libsettings.so", "full"),
     ("bin/cnd", "lite"),
+    # The Widevine CDM.  See the comment below and
+    # notes/2026-11-16-widevine.md.
+    ("vendor/lib/mediadrm/libwvdrmengine.so", "lite"),
 ]
 
-# deliberately NOT patched: system/vendor/lib/mediadrm/libwvdrmengine.so also
-# imports the CAF runtime, but mediadrmserver loads the AOSP libmediadrm.so in
-# the same process, so re-pointing it would mix two protobuf runtimes in one
-# address space.  Widevine is useless on this device anyway (no CDM), so the
-# plugin is left broken on purpose - see notes/protobuf-runtime.md.
+# The Widevine CDM (vendor/lib/mediadrm/libwvdrmengine.so) imports the CAF
+# runtime as well - 46 protobuf symbols, of which the AOSP 3.0 runtime only
+# provides 38 - so without the re-pointing the dlopen() of the plugin fails
+# and no DRM plugin at all is registered.
+#
+# The reason this used to be left broken on purpose does not apply any more:
+# the plugin is not loaded into mediadrmserver but into the DRM HIDL
+# service
+#
+#   /vendor/bin/hw/android.hardware.drm@1.0-service   (domain
+#   hal_drm_default)
+#
+# because frameworks/av/drm/libmediadrm/{DrmHal,CryptoHal}.cpp get the
+# factories over binder.  That process contains no AOSP protobuf runtime at
+# all: neither android.hardware.drm@1.0-impl.so, nor libstagefright_-
+# foundation.so, nor the AOSP ClearKey plugin (libdrmclearkeyplugin.so)
+# pulls one in, so the two runtimes never meet.
 
 OLD = {"lite": "libprotobuf-cpp-lite.so", "full": "libprotobuf-cpp-full.so"}
 NEW = {"lite": "libqc-protobuf-lite.so", "full": "libqc-protobuf-full.so"}

@@ -1,0 +1,63 @@
+# The DRM HIDL service and the Widevine CDM.
+#
+# Android 8.1 loads the DRM plugins (the ClearKey plugin and the Widevine
+# CDM) in the HIDL service process
+#
+#   /vendor/bin/hw/android.hardware.drm@1.0-service
+#
+# which runs in the domain hal_drm_default.  The frameworks/av side does
+# not touch the plugins any more: libmediadrm only talks to the service
+# over binder
+#
+#   frameworks/av/drm/libmediadrm/DrmHal.cpp:213   makeDrmFactories()
+#   frameworks/av/drm/libmediadrm/CryptoHal.cpp:115 makeCryptoFactories()
+#
+# so the whole Widevine stack - the CDM, the OEM crypto library and the
+# QSEE client library - lives in that one domain.  See
+# notes/2026-11-16-widevine.md.
+#
+# --- the Widevine provisioning (TEE) application --------------------------
+#
+# The Widevine CDM does not contain the key box; the provisioning data is
+# a separate TEE application that the CDM loads through the Qualcomm QSEE
+# client library (libQSEEComAPI.so, linked into the DRM service):
+#
+#   /vendor/firmware/widevine.mdt -> /persist-lg/firmware/widevine.mdt
+#
+# The symlink below /vendor/firmware carries the type firmware_file, the
+# file it points to carries the type persist_drm_file.  Reading the link
+# and reading the file behind it are two separate permission checks, and
+# the CAF policy only covers the first one:
+#
+#   device/qcom/sepolicy/common/hal_drm.te:32
+#       allow hal_drm firmware_file:dir  r_dir_perms;
+#   device/qcom/sepolicy/common/hal_drm.te:33
+#       allow hal_drm firmware_file:file r_file_perms;
+#
+# There is no rule for firmware_file:lnk_file (the symlink) and none at
+# all for persist_drm_file, so the DRM service is stopped at the link:
+#
+#   avc: denied { read } for comm="drm@1.0-service" name="widevine.mdt"
+#       scontext=u:r:hal_drm_default:s0 tcontext=u:object_r:firmware_file:s0
+#       tclass=lnk_file
+#
+# and QSEECOMAPI reports:
+#
+#   E QSEECOMAPI: : Error::Cannot open the file /vendor/firmware/widevine.mdt
+#       errno = 13
+#
+# Without the TEE application the CDM only reaches security level L3
+# (software); with it the device reports L1 (hardware backed).
+#
+# The rules below are the ones the OEM policy of this device gave to its
+# drmserver (LG shipped Android 7.0, where the CDM was still loaded into
+# the Java DRM service), restricted to what the 8.1 service actually
+# needs.  The tee domain already has the same access (the QSEE daemon
+# reads the same files), see device/qcom/sepolicy/common/qseecomd.te.
+allow hal_drm_default firmware_file:lnk_file { getattr ioctl lock map open read };
+allow hal_drm_default persist_drm_file:dir { getattr ioctl lock open read search };
+allow hal_drm_default persist_drm_file:file { getattr ioctl lock map open read };
+
+# The provisioning data is read out of the persistent partition by the
+# CDM itself, which needs to look at the file name and its size.
+allow hal_drm_default persist_drm_file:lnk_file { getattr ioctl lock map open read };
