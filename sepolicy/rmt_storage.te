@@ -1,1 +1,10 @@
-allow rmt_storage self:capability {dac_override net_raw};
+# rmt_storage talks to the remoteproc shared memory entry and needs a
+# few capabilities of its own.
+#
+# sys_admin is needed for ioprio_set().  CAF grants it in the legacy
+# policy for the older (non-"common") HALs this device uses:
+#   device/qcom/sepolicy/legacy-common/rmt_storage.te:1
+#     allow rmt_storage self:capability sys_admin;
+# The "common" policy (device/qcom/sepolicy/common/rmt_storage.te:16)
+# replaces it with a narrower set that does not work here.
+allow rmt_storage self:capability {dac_override net_raw sys_admin};

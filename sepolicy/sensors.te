@@ -1,2 +1,22 @@
-allow sensors sensors_data_file:file { open read write getattr };
-allow sensors sensors_data_file:dir { open read ioctl getattr };
+# The CAF sensors daemon (sensors.qcom) keeps its registry in
+# /sns/cal/sns.reg and creates it on the first boot.
+#
+# /sns and /sns/cal carry the sensors_data_file label (see
+# sepolicy/file_contexts), which is also the label CAF uses for the
+# sensor directories below /data.
+#
+# The rules are the ones CAF keeps in its legacy policy, which is not
+# part of this build:
+#   device/qcom/sepolicy/legacy-common/sensors.te:5-6
+#     allow sensors sensors_data_file:dir create_dir_perms;
+#     allow sensors sensors_data_file:file create_file_perms;
+#
+# "search" (part of r_dir_perms) is what the daemon needs to resolve
+# the /sns/cal/sns.reg path at all - without it realpath() fails and the
+# registry file is never created:
+#   E Sensors : sns_fsa_la.c(84):realpath failed for directory name13
+#   E Sensors : sns_reg_la.c(426):Error creating registry file
+#   E Sensors : sns_reg_la.c(103):reg_read: reg file not open
+#   E Sensors : sns_reg.c(335):Received error from sns_reg_read/write 5
+allow sensors sensors_data_file:dir create_dir_perms;
+allow sensors sensors_data_file:file create_file_perms;

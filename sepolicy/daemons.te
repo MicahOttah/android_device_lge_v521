@@ -14,6 +14,31 @@
 # data files and use raw sockets.
 allow cnd self:capability { chown dac_override fsetid net_raw setgid setuid };
 
+# cnd removes the stale wpa_supplicant control socket before the
+# supplicant binds a new one.  CAF does that with its own wpa_socket
+# type (device/qcom/sepolicy/common/cnd.te:25
+#     allow cnd wpa_socket:sock_file { create unlink setattr };),
+# but here the socket is labelled with the *platform* type, because the
+# platform file contexts have
+#   /data/misc/wifi/sockets/wpa_ctrl.*   u:object_r:system_wpa_socket:s0
+# (system/sepolicy/private/file_contexts:386).
+#
+# "unlink" is the only permission that is missing; the permission to
+# remove the name from the directory (remove_name on wpa_socket:dir) is
+# already there from the CAF rules.
+#
+# The platform neverallow that keeps vendor domains away from the
+# sockets of the core domains
+#   neverallow { domain -coredomain -appdomain
+#                -socket_between_core_and_violators }
+#               { coredomain_socket core_data_file_type unlabeled
+#               }:sock_file ~{ append getattr ioctl read write };
+# only covers the permissions that allow reading from or writing to the
+# socket - "unlink" is not among them.  The neverallow itself is
+# treble-only anyway and PRODUCT_FULL_TREBLE is not set for this
+# device.
+allow cnd system_wpa_socket:sock_file unlink;
+
 # --- qmuxd ---------------------------------------------------------------
 # qmuxd talks to the diagnostic device and reads the subsystem names
 # from sysfs.
@@ -27,6 +52,20 @@ allow sensors sysfs:file r_file_perms;
 
 # --- time_daemon ---------------------------------------------------------
 allow time_daemon sysfs:file r_file_perms;
+
+# --- wcnss_service -------------------------------------------------------
+# wcnss_service looks for the WLAN partition below /dev/block.  The
+# directory /dev/block itself carries the block_device label, because the
+# platform file context
+#   /dev/block(/.*)?   u:object_r:block_device:s0
+# also matches the directory itself (the group is optional), so resolving
+# any path below it needs "search" on that directory.
+#
+# The platform grants the same permission to the toolbox for the same
+# reason:
+#   system/sepolicy/public/toolbox.te:30
+#     allow toolbox block_device:dir search;
+allow wcnss_service block_device:dir search;
 
 # --- thermal-engine ------------------------------------------------------
 allow thermal-engine sysfs_spmi_dev:dir r_dir_perms;
