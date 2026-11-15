@@ -68,6 +68,14 @@ ro.vendor.extension_library=libqti-perfd-client.so
 # RIL
 rild.libpath=/system/vendor/lib/libril-qc-qmi-1.so
 rild.libargs=-d /dev/smd0
+# The CAF RIL's verbose logging path is broken on this device: when it logs a
+# SIM_IO request it walks off into a wild pointer and rild dies with
+# SIGSEGV inside qcril_format_log_msg() -> vsnprintf() -> strlen().
+#   backtrace: qcril_uim_request_sim_io -> qcril_format_log_msg -> vsnprintf
+#              -> __vfprintf -> strlen
+# The stock LG ROM leaves this logging off, so keep it off here as well.
+persist.radio.adb_log_on=0
+persist.radio.ril_log_enabled=0
 persist.rild.nitz_plmn=
 persist.rild.nitz_long_ons_0=
 persist.rild.nitz_long_ons_1=
