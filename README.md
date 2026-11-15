@@ -46,7 +46,7 @@ pulled from here without touching the upstream trees.
 | [`android_frameworks_base`](https://github.com/MicahOttah/android_frameworks_base) | `lineage-15.1-v521` | The Android-7.0-era compatibility shims for the stock CNE blobs. |
 | [`android_hardware_ril`](https://github.com/MicahOttah/android_hardware_ril) | `lineage-15.1-caf` | The CAF branch of the RIL with the SIM_IO / signal strength / data registration fixes. |
 | [`android_bootable_recovery`](https://github.com/MicahOttah/android_bootable_recovery) | `lineage-15.1-v521` | The stock LineageOS recovery: no silent wipe, no reboot out of the recovery. |
-| [`android_bootable_recovery-twrp`](https://github.com/MicahOttah/android_bootable_recovery-twrp) | `lineage-15.1-v521` | The TWRP crash handler. **Not pushed yet** - see *Known issues in the tree*. |
+| [`android_bootable_recovery-twrp`](https://github.com/MicahOttah/android_bootable_recovery-twrp) | `lineage-15.1-v521` | The TWRP crash handler.  Pushed as a **flattened snapshot** - see *Known issues in the tree*. |
 | [`android_device_lge_v521_twrp`](https://github.com/MicahOttah/android_device_lge_v521_twrp) | - | Standalone copy of the TWRP build files. Superseded: they live in this tree since `5e3dbf2`. |
 | [`android_app_QuickButton`](https://github.com/MicahOttah/android_app_QuickButton) | - | Standalone copy of the QuickButton app. Superseded: it lives in this tree since `b06ff03`. |
 
@@ -349,14 +349,14 @@ The SELinux side is a new `v521swap` domain with its own `exec` type, a
 
 ## Known issues in the tree
 
-* `bootable/recovery-twrp` **cannot be pushed** with its history.  It is a
+* `bootable/recovery-twrp` **cannot be pushed with its history.**  It is a
   shallow clone (two commits) and its upstream
   (`OmniROM/android_bootable_recovery-twrp`) no longer exists on GitHub, so
   the server rejects the push with
-  `remote: fatal: did not receive expected object 32aef7a2...`.  The commit
-  (`790c815`) exists locally and the fork
-  `MicahOttah/android_bootable_recovery-twrp` exists but is empty; pushing
-  it needs an orphan commit with the full tree.
+  `remote: fatal: did not receive expected object 32aef7a2...`.  The branch
+  on GitHub is therefore a **flattened snapshot** (`c3f1666`) with exactly
+  the same tree as the local history, and the original history is kept
+  locally in the branch `backup/pre-snapshot`.
 * The 64-bit binder mode of the kernel had a latent bug: `binder_alloc_buf()`
   and `binder_transaction()` place the offsets array with
   `ALIGN(data_size, sizeof(void *))`, which is 4 on this 32-bit kernel,
@@ -471,8 +471,15 @@ the rest are the changes that could not live in it.
 | --- | --- | --- |
 | `9ab3795a8` | 2026-11-15 | v521: do not wipe /data silently and do not reboot out of the recovery |
 
-### `MicahOttah/android_bootable_recovery-twrp` - `lineage-15.1-v521` (not pushed)
+### `MicahOttah/android_bootable_recovery-twrp` - `lineage-15.1-v521`
 
 | Commit | Date | Subject |
 | --- | --- | --- |
+| `c3f1666` | 2026-11-15 | v521: the TWRP tree of the LG G Pad X 8.0 (V521) - flattened snapshot |
 | `790c815` | 2026-11-15 | v521: print a crash report when the GUI dies |
+| `a137904` | 2026-11-15 | v521: add a README for the fork |
+
+The last two commits are the history of the snapshot; they are not reachable
+from the pushed branch (the upstream repository is gone and the local clone
+is shallow), but the tree is identical.  They are kept in the local branch
+`backup/pre-snapshot`.
