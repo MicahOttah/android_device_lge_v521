@@ -28,6 +28,29 @@ what is missing.
 ## What works
 
 * Boots into LineageOS 15.1 (8.1.0) userdebug.
+* **SELinux enforcing.** `BoardConfig.mk` adds
+  `androidboot.selinux=enforcing` to the kernel cmdline and the device
+  reports `getenforce` = `Enforcing`.  The only avc denials left are the
+  two `kernel -> kernel capability` tuples that the platform neverallow
+  forbids to be granted (see *What does not work yet*).  Getting there
+  needed an explicit `file_contexts` entry for each of the 21 CAF vendor
+  daemons, because AOSP `init` takes the domain of a service from the
+  file context of the executable - and the v521 blob list installs them
+  into `/system/bin`, not `/system/vendor/bin` where the CAF policy
+  expects them.
+* **The sensor stack.** `dumpsys sensorservice` reports
+  `Total 26 h/w sensors, 26 running` - accelerometer, magnetometer,
+  gravity, linear acceleration, ...  With 26 sensors the accelerometer is
+  present and the **auto-rotation works**.  The board has no gyroscope
+  (the accelerometer is an STMicroelectronics K2HHTR), so the 27th entry
+  of the old framework list ("GeoMag Rotation Vector Sensor", handle
+  `0x5f67656f`) was a fusion pseudo-sensor and not a real one.
+* **The camera.** Both sensors work - the back camera and the front
+  camera - including preview, stills, RAW capture and the scene modes.
+  `dumpsys media.camera` reports `Number of camera devices: 2`, and the
+  event log shows the stock camera app (`org.cyanogenmod.snap`) opening
+  and closing both of them.  The sensor driver that is probed is the
+  Samsung `s5k5e2` (`hi553`).
 * HIDL: `manifest.xml` plus passthrough `-impl` wrappers for the legacy
   vendor HALs, the graphics allocator/composer running as `hwbinder`
   services.
@@ -35,6 +58,9 @@ what is missing.
   lease, DNS and TLS working.
 * ADB over USB (root, no auth prompt - see *Bring-up settings*).
 * TWRP 3.2.3-0 recovery (built from the tree with `WITH_TWRP=true`).
+* The stock LineageOS recovery, built from the same tree
+  (`bin/build 15.1 recovery recoveryimage`).  It carries the same kernel
+  and the same ramdisk policy as `boot.img`.
 * **The radio and mobile data.** The SIM registers on LTE, the EF files are
   readable, and the data path comes up on `rmnet_data0`:
 
@@ -64,38 +90,40 @@ what is missing.
 
 ## What does not work yet
 
-1. **SELinux is permissive.** `BoardConfig.mk` adds
-   `androidboot.selinux=permissive` to the kernel cmdline because the
-   sepolicy for the HIDL HALs is not complete yet. Enforcing has not been
-   attempted; expect `avc: denied` until the policy is filled in.
-   Known gaps: `qmuxd` (`block_suspend`), `netmgrd` (`netlink_route_socket`,
-   socket `ioctl`/`create`), and the init services `qmuxd` and
-   `rmt_storage` have no domain at all.
+1. **One avc denial pair is left.** The port runs in **enforcing** mode and
+   the only denials left are
 
-2. **One sensor is missing.** The vendor sensor HAL reports *26 h/w
-   sensors, 26 running*; the framework's sensor list has 27 entries
-   (handles `0x01`-`0x1a` plus one with the handle `0x5f67656f`,
-   "GeoMag Rotation Vector Sensor").  The sensor configuration
-   (`/etc/sensors/sensor_def_common.conf`, `sensor_def_variable.conf`) is
-   byte-identical to the stock ROM and the vendor `sensors.qcom` differs
-   from the stock copy only in relocation bytes, so the difference is
-   somewhere else.  The board has no gyroscope fitted (the accelerometer
-   is an STMicroelectronics K2HHTR), which is the most likely candidate.
+   ```
+   avc: denied { dac_override } for comm="kworker/0:4"
+       scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=capability
+   avc: denied { dac_read_search } for comm="kworker/0:4"
+       scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=capability
+   ```
 
-3. **Camera is untested.** The HIDL camera passthrough is wired up, but no
-   picture has been taken and the legacy `camera.msm8952` blob has not been
-   validated on 8.1.
+   The platform policy forbids granting them
+   (`neverallow kernel self:capability { dac_override dac_read_search };`,
+   `system/sepolicy/public/kernel.te:104`), so this one needs a
+   kernel-side decision.  The worker still completes its job.
 
-4. **No OTA installed.** The stock recovery is built from this tree, but no
-   OTA package has been installed.
+2. **No OTA installed.** The LineageOS recovery is built from this tree,
+   but no OTA package has been installed.
 
-5. **DPM (`dpmd`) is not installed.** The blobs are not in the tree yet and
+3. **DPM (`dpmd`) is not installed.** The blobs are not in the tree yet and
    there is no `dpmd` service, so the device has no device policy manager.
 
-6. **Widevine is not working.** `system/vendor/lib/mediadrm/libwvdrmengine.so`
+4. **Widevine is not working.** `system/vendor/lib/mediadrm/libwvdrmengine.so`
    and `system/vendor/lib/mediacas/libclearkeycasplugin.so` are CAF-built
    and still import the CAF protobuf runtime into a process that also has
    AOSP's runtime.  Deliberately left alone.
+
+5. **Three optional camera post-processing blobs are missing**:
+   `libmmcamera_sw_tnr.so` (software temporal noise reduction),
+   `libmmcamera_trueportrait_lib.so` (portrait bokeh) and
+   `libmmcamera_stillmore_lib.so`.  They are not part of the V521 blob set
+   in any upstream repository, so the camera daemon logs
+   `Error opening frameproc library ...` for them and falls back to the
+   default processing chain.  Stills, preview, RAW capture and the scene
+   modes all work without them.
 
 ## Bring-up settings
 
@@ -103,7 +131,7 @@ what is missing.
 
 * USB debugging is enabled from the first boot and unauthenticated
   (`persist.sys.usb.config=mtp,adb`, `WITH_ADB_INSECURE=true`).
-* SELinux is permissive (see above).
+* SELinux is **enforcing** (`androidboot.selinux=enforcing`).
 * A persistent logcat is written to `/data/misc/logd`.
 
 ## Known issues in the tree
