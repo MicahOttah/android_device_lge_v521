@@ -16,6 +16,21 @@
 
 $(call inherit-product, $(SRC_TARGET_DIR)/product/languages_full.mk)
 
+# Qualcomm CAF protobuf runtime
+# The Connectivity Engine / radio blobs (libcne.so, libcneapiclient.so,
+# libwqe.so, libsettings.so, bin/cnd) import symbols that only exist in the
+# stock CAF 3.5 protobuf runtime, while LineageOS ships the AOSP runtime in
+# /system/lib.  Both have to coexist, so the stock runtime is installed under a
+# second name in /system/vendor/lib and the blobs are re-pointed at it.
+# The patch is idempotent and rewrites the vendor blobs from their pristine
+# state, so it is safe to run before every build.  See patch-qc-protobuf.py.
+#
+# device.mk is pulled in with a relative path, so LOCAL_PATH is not guaranteed
+# to point here - fall back to the path relative to the build tree root.
+V521_PATCH_QC_PROTO := $(firstword $(wildcard $(LOCAL_PATH)/patch-qc-protobuf.py \
+                                            device/lge/v521/patch-qc-protobuf.py))
+$(shell $(V521_PATCH_QC_PROTO) --quiet)
+
 # Get non-open-source specific aspects
 $(call inherit-product-if-exists, vendor/lge/v521/v521-vendor.mk)
 
@@ -98,6 +113,19 @@ PRODUCT_PACKAGES += \
     cneapiclient \
     com.quicinc.cne \
     services-ext
+
+# Shim that replaces AOSP's libandroid.so for libwqe.so, so that the AOSP
+# media/protobuf stack stays out of the CAF processes (cnd).  See
+# notes/protobuf-runtime.md.
+PRODUCT_PACKAGES += \
+    libcnesock
+
+# Shim that replaces AOSP's libmedia.so for libril-qc-qmi-1.so: it provides
+# the android::AudioSystem entry points that moved from libmedia.so to
+# libaudioclient.so in Android 8.1, without dragging AOSP's protobuf runtime
+# into the radio process.  See notes/protobuf-runtime.md.
+PRODUCT_PACKAGES += \
+    libasys
 
 # Display
 PRODUCT_PACKAGES += \

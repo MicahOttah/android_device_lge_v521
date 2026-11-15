@@ -175,6 +175,14 @@ vendor/lib/libmm-dspp-utils.so
 vendor/lib/libmm-qdcm-diag.so
 vendor/lib/libmm-qdcm.so
 
+# Protobuf
+# Renamed copy of the stock CAF 3.5 protobuf runtime.  The AOSP runtime that
+# ships in /system/lib lacks symbols the CNE/radio blobs import, so the stock
+# one is installed under a second name and the blobs are re-pointed at it.
+# See patch-qc-protobuf.py.
+vendor/lib/libqc-protobuf-lite.so
+vendor/lib/libqc-protobuf-full.so
+
 # QMI
 bin/irsc_util
 vendor/lib/libdiag.so|79596de67a5d02a0896205e527e3eb74dc8331a6

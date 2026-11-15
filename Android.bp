@@ -1,0 +1,64 @@
+// Shim library that provides the two network helpers that LG's CAF blob
+// libwqe.so takes from AOSP's libandroid.so.
+//
+// libwqe.so is the only CAF blob that links libandroid.so, and libandroid.so
+// drags in libandroid_runtime.so -> libhwui.so / libmedia.so -> libmediadrm.so
+// -> AOSP's protobuf runtime.  In a process that already has CAF's protobuf
+// runtime in its global scope (cnd) the AOSP libraries bind their protobuf
+// symbols to it and abort with a protobuf version mismatch.
+//
+// Cutting that edge keeps the AOSP protobuf runtime out of the CAF
+// processes.  The replacement library has to be named with exactly as many
+// characters as "libandroid.so" (13), because the DT_NEEDED entry is patched
+// in place inside libwqe.so's .dynstr.
+//
+// See notes/protobuf-runtime.md.
+cc_library_shared {
+    name: "libcnesock",
+
+    srcs: ["cnesock.c"],
+
+    shared_libs: [
+        "libnetd_client",
+    ],
+
+    include_dirs: [
+        "system/netd/include",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}
+
+// Shim library that gives LG's CAF radio blob the android::AudioSystem
+// entry points it expects.
+//
+// LG built libril-qc-qmi-1.so against Android 8.0, where AudioSystem lived
+// in libmedia.so.  LineageOS 15.1 is Android 8.1, where AudioSystem moved
+// to libaudioclient.so - and where libmedia.so additionally pulls in
+// libmediadrm.so, the first consumer of AOSP's protobuf runtime.  Linking
+// the CAF blob against the 8.1 libmedia.so would therefore mix the CAF and
+// the AOSP protobuf runtime in the radio process.
+//
+// So the DT_NEEDED entry is repointed at this library, which pulls in
+// libaudioclient.so (and no protobuf runtime).  The name has to be no
+// longer than "libmedia.so" (11 characters) because the DT_NEEDED string is
+// patched in place inside libril-qc-qmi-1.so's .dynstr.
+//
+// See notes/protobuf-runtime.md.
+cc_library_shared {
+    name: "libasys",
+
+    srcs: ["asys.c"],
+
+    shared_libs: [
+        "libaudioclient",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}
