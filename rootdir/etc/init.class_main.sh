@@ -60,14 +60,10 @@ case "$baseband" in
           setprop persist.radio.multisim.config dsda
     esac
 
-    multisim=`getprop persist.radio.multisim.config`
-
-    if [ "$multisim" = "dsds" ] || [ "$multisim" = "dsda" ]; then
-        start ril-daemon2
-    elif [ "$multisim" = "tsts" ]; then
-        start ril-daemon2
-        start ril-daemon3
-    fi
+    # NOTE: the CAF multi-SIM daemons (ril-daemon2/ril-daemon3) were removed
+    # together with LG's stock CAF libril.so - see init.qcom.rc. The v521 is
+    # single-SIM, so persist.radio.multisim.config is never set and there is
+    # nothing to start here.
 
     case "$datamode" in
         "tethered")
