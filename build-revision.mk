@@ -14,13 +14,17 @@
 # is in them.  bin/build replaces it with a revision that says what the
 # build is and which attempt it is:
 #
-#     v521-15.1-a12
+#     v521-15.1-build14
+#
+# The revision is the build number, so it is also the name of the OTA
+# package (lineage_v521-ota-v521-15.1-build14.zip) and the string that
+# Settings -> About phone -> Build number shows.
 #
 # The values arrive on the make command line:
 #
-#     V521_BUILD_ATTEMPT   the attempt number          (12)
-#     V521_BUILD_REVISION  the revision string         (v521-15.1-a12)
-#     V521_BUILD_COMMIT    the device tree commit      (ea36fe5)
+#     V521_BUILD_ATTEMPT   the attempt number          (14)
+#     V521_BUILD_REVISION  the revision string         (v521-15.1-build14)
+#     V521_BUILD_COMMIT    the device tree commit      (9fa038b)
 #
 # The properties are only added when the variables are set, because an
 # empty property value is not valid in build.prop, and a plain "mka" that
