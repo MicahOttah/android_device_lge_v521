@@ -47,6 +47,9 @@ pulled from here without touching the upstream trees.
 | [`android_hardware_ril`](https://github.com/MicahOttah/android_hardware_ril) | `lineage-15.1-caf` | The CAF branch of the RIL with the SIM_IO / signal strength / data registration fixes. |
 | [`android_bootable_recovery`](https://github.com/MicahOttah/android_bootable_recovery) | `lineage-15.1-v521` | The stock LineageOS recovery: no silent wipe, no reboot out of the recovery. |
 | [`android_bootable_recovery-twrp`](https://github.com/MicahOttah/android_bootable_recovery-twrp) | `lineage-15.1-v521` | The TWRP crash handler.  Pushed as a **flattened snapshot** - see *Known issues in the tree*. |
+| [`android_frameworks_native`](https://github.com/MicahOttah/android_frameworks_native) | `lineage-15.1-v521` | The gralloc debug log lines. |
+| [`android_hardware_interfaces`](https://github.com/MicahOttah/android_hardware_interfaces) | `lineage-15.1-v521` | The gralloc debug log lines. |
+| [`android_hardware_qcom_display`](https://github.com/MicahOttah/android_hardware_qcom_display) | `lineage-15.1-v521-msm8952` | The gralloc debug log lines for the msm8952. |
 | [`android_device_lge_v521_twrp`](https://github.com/MicahOttah/android_device_lge_v521_twrp) | - | Standalone copy of the TWRP build files. Superseded: they live in this tree since `5e3dbf2`. |
 | [`android_app_QuickButton`](https://github.com/MicahOttah/android_app_QuickButton) | - | Standalone copy of the QuickButton app. Superseded: it lives in this tree since `b06ff03`. |
 
@@ -386,11 +389,20 @@ The SELinux side is a new `v521swap` domain with its own `exec` type, a
   taken out of a `.mk` file, so the stale files are packaged into the
   system image otherwise.  `bin/clean-twrp-leftovers` and
   `bin/clean-stale-outputs` in the working directory do this.
-* Two debug log lines are still in the tree and are **not** meant to go
-  into a release: `frameworks/native/libs/ui/Gralloc2.cpp` and
-  `hardware/interfaces/graphics/allocator/2.0/default/Gralloc0Allocator.cpp`
-  (the `V521DBG` lines).  They were added while the gralloc allocation
-  failure was being chased.
+* Three debug log lines are still in the tree, all of them on the error
+  path of the gralloc allocator and all of them committed and pushed:
+
+  | Repository | Branch | File |
+  | --- | --- | --- |
+  | `MicahOttah/android_frameworks_native` | `lineage-15.1-v521` | `libs/ui/Gralloc2.cpp` |
+  | `MicahOttah/android_hardware_interfaces` | `lineage-15.1-v521` | `graphics/allocator/2.0/default/Gralloc0Allocator.cpp` |
+  | `MicahOttah/android_hardware_qcom_display` | `lineage-15.1-v521-msm8952` | `libgralloc/gpu.cpp` |
+
+  They print the error code, the dimensions, the format and the usage flags
+  of an allocation that failed, which is what tells a format the allocator
+  does not know apart from a usage combination it rejects.  They were added
+  while the gralloc allocation failure was being chased; they cost nothing
+  on a working allocation.
 
 ## Commit history
 
@@ -464,6 +476,24 @@ the rest are the changes that could not live in it.
 | Commit | Date | Subject |
 | --- | --- | --- |
 | `56e571d` | 2026-11-15 | v521: allow building with an insecure adb |
+
+### `MicahOttah/android_frameworks_native` - `lineage-15.1-v521`
+
+| Commit | Date | Subject |
+| --- | --- | --- |
+| `3216868` | 2026-11-15 | v521: log the reason when a gralloc descriptor cannot be created |
+
+### `MicahOttah/android_hardware_interfaces` - `lineage-15.1-v521`
+
+| Commit | Date | Subject |
+| --- | --- | --- |
+| `8f0163f` | 2026-11-15 | v521: log the reason when a gralloc allocation fails |
+
+### `MicahOttah/android_hardware_qcom_display` - `lineage-15.1-v521-msm8952`
+
+| Commit | Date | Subject |
+| --- | --- | --- |
+| `28c0854` | 2026-11-15 | v521: log the reason when a gralloc allocation fails |
 
 ### `MicahOttah/android_bootable_recovery` - `lineage-15.1-v521`
 
