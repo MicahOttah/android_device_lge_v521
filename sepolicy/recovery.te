@@ -1,0 +1,98 @@
+# v521: SELinux rules for the LineageOS recovery on the LG G Pad X 8.0.
+#
+# The rules below are only compiled into the recovery image: recovery_only()
+# expands to nothing when the platform policy is built
+# (system/sepolicy/public/te_macros).
+#
+# They all come from the denials that were logged by the recovery kernel
+# console (avc: denied ...) during a recovery boot:
+#
+#   avc:  denied  { write } for  pid=362 comm="recovery" name="kmsg"
+#         scontext=u:r:recovery:s0 tcontext=u:object_r:kmsg_device:s0
+#         tclass=chr_file
+#   avc:  denied  { search } for  pid=362 comm="recovery" name="time"
+#         dev="mmcblk0p54" scontext=u:r:recovery:s0
+#         tcontext=u:object_r:time_data_file:s0 tclass=dir
+#   avc:  denied  { search } for  pid=371 comm="sh" dev="pstore"
+#         scontext=u:r:vold:s0 tcontext=u:object_r:pstorefs:s0 tclass=dir
+#   avc:  denied  { search } for  pid=363 comm="recovery" name="tmp"
+#         dev="mmcblk0p54" ino=584066
+#         scontext=u:r:recovery:s0 tcontext=u:object_r:shell_data_file:s0
+#         tclass=dir
+
+recovery_only(`
+  # Let the recovery write to /dev/kmsg.  The recovery's log messages end up
+  # there and are then visible in /sys/fs/pstore/console-ramoops-0 after the
+  # next boot, which is the only way to debug a recovery that reboots or
+  # hangs.  Without this rule the recovery log is completely invisible.
+  #
+  # "open" is needed on top of "write": writing to a character device means
+  # opening it first, and the audit log shows
+  #
+  #   avc:  denied  { open } for  pid=364 comm="recovery" path="/dev/kmsg"
+  #         scontext=u:r:recovery:s0 tcontext=u:object_r:kmsg_device:s0
+  #         tclass=chr_file
+  #
+  # when only "write" is allowed.
+  allow recovery kmsg_device:chr_file { open write getattr };
+
+  # The recovery sets the system clock from the last known time.
+  #
+  #   avc:  denied  { sys_time } for  pid=364 comm="recovery" capability=25
+  #         scontext=u:r:recovery:s0 tcontext=u:r:recovery:s0
+  #         tclass=capability
+  #
+  # The recovery needs it for set_time(), otherwise the clock stays at the
+  # epoch (1970-02-01) and every log line is stamped with that.
+  allow recovery self:capability sys_time;
+
+  # The recovery looks for /data/misc/time/... (the time_daemon data
+  # directory) while it sets the system time.  The type is declared in
+  # device/qcom/sepolicy/common/time_daemon.te.
+  allow recovery time_data_file:dir search;
+  # ... and it reads /data/time/ats_1 to restore the clock.
+  allow recovery time_data_file:file r_file_perms;
+
+  # minivold walks /sys/fs/pstore to look for the log of the previous boot.
+  allow vold pstorefs:dir search;
+
+  # ---------------------------------------------------------------------
+  # Read-only access to the update package.
+  #
+  # "Apply update from storage" browses the emulated volume, which is the
+  # real /data partition, and "Apply from ADB" sideloads a package that
+  # arrives over USB.  Either way the recovery has to open() and mmap() a
+  # file that lives on /data.  Without these rules the install dies with
+  #
+  #   avc:  denied  { search } for  pid=363 comm="recovery" name="tmp"
+  #         dev="mmcblk0p54" ino=584066
+  #         scontext=u:r:recovery:s0
+  #         tcontext=u:object_r:shell_data_file:s0 tclass=dir
+  #
+  #   E:Unable to open '"'"'/data/local/tmp/testpkg-signed.zip'"'"':
+  #     Permission denied
+  #
+  # Only read access is granted.  The upstream neverallows still forbid the
+  # recovery from writing to or executing anything under /data
+  # (system/sepolicy/public/recovery.te), and
+  # system/sepolicy/public/domain.te now exempts "recovery" from the
+  # shell_data_file open/search neverallows.
+  #
+  # /data/local/tmp is "shell_data_file" (that is where "adb push" puts a
+  # file), /data/media is "media_rw_data_file", everything else below /data
+  # is "system_data_file".
+  allow recovery shell_data_file:dir { open search getattr read };
+  allow recovery shell_data_file:file r_file_perms;
+  allow recovery media_rw_data_file:dir { open search getattr read };
+  allow recovery media_rw_data_file:file r_file_perms;
+  allow recovery system_data_file:dir { open search getattr read };
+  allow recovery system_data_file:file r_file_perms;
+
+  # The removable SD card.  minivold mounts it on /storage/<uuid>; the
+  # files on it are labelled "vfat" (the fs_use entry in file_contexts) and
+  # the mount point itself is "storage_file".
+  allow recovery vfat:dir r_dir_perms;
+  allow recovery vfat:file r_file_perms;
+  allow recovery storage_file:dir r_dir_perms;
+  allow recovery storage_file:lnk_file r_file_perms;
+')
