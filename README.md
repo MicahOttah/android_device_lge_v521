@@ -25,7 +25,7 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | DPM (`dpmd`) | **working** - daemon running, NSRM in place |
 | Widevine | **working** - **L1** (hardware backed) under enforcing |
 | TWRP recovery | **working** - built from this tree, protected |
-| Build revision | **working** - `v521-15.1-buildN` in the build number and in the OTA name |
+| Build revision | **working** - `v521-15.1-buildN` in the build number and in the OTA name (the revision-named package has not been installed yet) |
 | Swap (zRAM / SD card) | **in progress** - see *Swap* |
 
 ## Repositories
@@ -167,6 +167,27 @@ the device tree builds without them and warns what is missing.
      (software only) - the three rules are exactly the difference between
      L3 and L1.
 
+* **The OTA install path.**  A real 392 MB LineageOS OTA was installed end
+  to end from the stock LineageOS recovery: the recovery took the package
+  from `/cache/recovery/command`, verified the signature against RSA key 0,
+  wrote 994 590 720 bytes to `/system`, and `/cache/recovery/last_install`
+  says `1` (= `INSTALL_SUCCESS`):
+
+  ```
+  I:Got 2 arguments from /cache/recovery/command
+  I:Keeping /data mounted for /data/local/tmp/lineage-ota.zip
+  I:Update location: /data/local/tmp/lineage-ota.zip
+  Verifying update package...
+  I:comment is 1738 bytes; signature is 1720 bytes from end
+  I:whole-file signature verified against RSA key 0
+  Installing update...
+  ```
+
+  That was done for the enforcing ROM itself, so the enforcing system image
+  is the one that is known to survive a real install.  The TWRP sideload
+  path (`bin/dirty-flash`) works as well and is what the later builds were
+  installed with.
+
 ## What does not work yet
 
 1. **One avc denial pair is left.** The port runs in **enforcing** mode and
@@ -184,9 +205,14 @@ the device tree builds without them and warns what is missing.
    `system/sepolicy/public/kernel.te:104`), so this one needs a
    kernel-side decision.  The worker still completes its job.
 
-2. **No OTA installed on the device yet.**  The OTAs are built and packaged
-   (see *The build revision*), but the device still runs the build13
-   system, so the OTA path itself is not proven end to end.
+2. **The revision-named OTA has not been installed yet.**  The OTAs that
+   were installed on the device carried the old SHA1 build numbers (the
+   last one was `141b80bd75`), because the revision mechanism came later.
+   `lineage-15.1-20261115-UNOFFICIAL-v521-build14.zip` is built and
+   packaged, but the device still runs `v521-15.1-a13` - the Widevine
+   build, which was installed with the TWRP sideload.  So the package
+   *name* and the build number of a release have not been through the
+   recovery yet.
 
 3. **Three optional camera post-processing blobs are missing**:
    `libmmcamera_sw_tnr.so` (software temporal noise reduction),
