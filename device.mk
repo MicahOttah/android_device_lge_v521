@@ -31,6 +31,14 @@ V521_PATCH_QC_PROTO := $(firstword $(wildcard $(LOCAL_PATH)/patch-qc-protobuf.py
                                             device/lge/v521/patch-qc-protobuf.py))
 $(shell $(V521_PATCH_QC_PROTO) --quiet)
 
+# Human-readable build revision (ro.v521.build.revision and friends).
+#
+# Same path dance as above: device.mk is pulled in with a relative path,
+# so LOCAL_PATH is not guaranteed to point here.
+V521_BUILD_REVISION_MK := $(firstword $(wildcard $(LOCAL_PATH)/build-revision.mk \
+                                             device/lge/v521/build-revision.mk))
+include $(V521_BUILD_REVISION_MK)
+
 # Get non-open-source specific aspects
 $(call inherit-product-if-exists, vendor/lge/v521/v521-vendor.mk)
 
