@@ -349,16 +349,16 @@ The commits of the port, per repository.
 
 | Repository | Branch | Commits |
 | --- | --- | --- |
-| `android_device_lge_v521` | `lineage-15.1` | `661a0db` bring up 15.1, `f9c6679` README, `1dbec81` CAF blobs out of the protobuf stack, `1aedb0a` CAF RIL logging off, `6025bf2` drop the stock CAF libril.so, `a0fbd3c` port status, `646ec72` SELinux domains for the vendor daemons, `f2c0662` SELinux enforcing, `a472105` README, `0ca0748` recovery: /dev/block/bootdevice, `ea36fe5` DPM daemon, `0c06849` ELF string patcher, `c462ff6` build revision, `9fa038b` Widevine, `829e43d` name the build number buildN, `5e3dbf2` TWRP build files, `b06ff03` QuickButton app, `06ede19` README, `8f64c77` README, `d7c831c` README, `f786eeb` README |
-| `proprietary_vendor_lge` | `lineage-15.1` | `46e5e31` CAF blobs out of the protobuf stack, `1a9bf59` drop the stock CAF libril.so, `f47a4e5` vendor modules, `24a590f` DPM daemon and libraries, `57c76d0` OEM crypto library, `61305a4` README |
-| `android_device_lge_common` | `lineage-15.1-v521` | `a60d894` skip LG's own consumer IR service, `ab4df2a` README |
-| `android_system_core` | `lineage-15.1-v521` | `5919882` never overwrite the recovery partition, `1320790` README |
-| `android_kernel_lge_msm8952` | `lineage-15.1-v521` | `8ed4186f` 64 bit get_user, no 32 bit binder, `22ac21ea` README |
-| `android_vendor_lineage` | `lineage-15.1-v521` | `56e571d` insecure adb, `81b4793` README |
-| `android_frameworks_base` | `lineage-15.1-v521` | `6a969646` 7.0-era compat APIs for the CNE blobs, `b739fac3` README |
-| `android_frameworks_native` | `lineage-15.1-v521` | `3216868` gralloc debug log lines |
-| `android_hardware_interfaces` | `lineage-15.1-v521` | `8f0163f` gralloc debug log lines |
-| `android_hardware_qcom_display` | `lineage-15.1-v521-msm8952` | `28c0854` gralloc debug log lines |
-| `android_hardware_ril` | `lineage-15.1-caf` | `f229a1f` CAF SIM_IO, command mapping, signal strength, data registration, `ecf1618` README |
-| `android_bootable_recovery` | `lineage-15.1-v521` | `9ab3795a8` no silent wipe, no reboot out of the recovery, `03cc256c` README |
-| `android_bootable_recovery-twrp` | `lineage-15.1-v521` | `c3f1666` flattened snapshot of `790c815` (crash report) and `a137904` (README) |
+| `android_device_lge_v521` | `lineage-15.1` | `f2c3bf0` bring up 15.1, `e0bd761` README, `c52c2b6` CAF blobs out of the protobuf stack, `566ee0d` CAF RIL logging off, `164f73b` drop the stock CAF libril.so, `7396d7d` port status, `cccc833` SELinux domains for the vendor daemons, `ec68ed8` SELinux enforcing, `bdbf752` README, `baffb98` recovery: /dev/block/bootdevice, `61880ad` DPM daemon, `de4f2e1` ELF string patcher, `83d6ffd` build revision, `fee61f0` Widevine, `bfabf1c` name the build number buildN, `eac79b4` TWRP build files, `e856f33` QuickButton app, `bf51acb` README, `dd2c567` README, `08b0a8c` README, `6bd0bc5` README |
+| `proprietary_vendor_lge` | `lineage-15.1` | `12617af` CAF blobs out of the protobuf stack, `98680e5` drop the stock CAF libril.so, `7dfb70d` vendor modules, `f8f1f62` DPM daemon and libraries, `35b9cc9` OEM crypto library, `ca0b734` README |
+| `android_device_lge_common` | `lineage-15.1-v521` | `7a9c238` skip LG's own consumer IR service, `3f8d7df` README |
+| `android_system_core` | `lineage-15.1-v521` | `5e3b6fb` never overwrite the recovery partition, `373c684` README |
+| `android_kernel_lge_msm8952` | `lineage-15.1-v521` | `55a07099` 64 bit get_user, no 32 bit binder, `8561be9c` README |
+| `android_vendor_lineage` | `lineage-15.1-v521` | `530bd69` insecure adb, `1be2a6f` README |
+| `android_frameworks_base` | `lineage-15.1-v521` | `11e63f07` 7.0-era compat APIs for the CNE blobs, `e67a0b17` README |
+| `android_frameworks_native` | `lineage-15.1-v521` | `8167e48` gralloc debug log lines |
+| `android_hardware_interfaces` | `lineage-15.1-v521` | `ece6c15` gralloc debug log lines |
+| `android_hardware_qcom_display` | `lineage-15.1-v521-msm8952` | `7f26f7d` gralloc debug log lines |
+| `android_hardware_ril` | `lineage-15.1-caf` | `904ec8a` CAF SIM_IO, command mapping, signal strength, data registration, `38352e9` README |
+| `android_bootable_recovery` | `lineage-15.1-v521` | `08bbbb07e` no silent wipe, no reboot out of the recovery, `897195b5` README |
+| `android_bootable_recovery-twrp` | `lineage-15.1-v521` | `e765bd1` flattened snapshot of `790c815` (crash report) and `a137904` (README) |
