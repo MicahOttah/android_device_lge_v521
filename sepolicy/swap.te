@@ -30,7 +30,9 @@ allow v521swap sysfs:dir search;
 allow v521swap sysfs:lnk_file read;
 
 # Qualcomm process reclaim on/off (persist.v521.swap.reclaim; "auto" = on
-# while zram is active).  The node already has its own CAF type.
+# while zram is active).  The node already has its own CAF type, and so does
+# its parameters/ directory, which has to be searched to reach it.
+allow v521swap sysfs_process_reclaim:dir search;
 allow v521swap sysfs_process_reclaim:file rw_file_perms;
 
 # vm.swappiness (persist.v521.swap.swappiness), labelled proc_swappiness in
