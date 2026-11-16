@@ -27,7 +27,7 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | USB diag port | working - only while USB debugging is enabled (`adb`, `mtp,adb`, `ptp,adb`); the modem answers |
 | TWRP recovery | working - built from this tree, protected |
 | Build revision | working - `v521-15.1-buildN` in the build number and in the OTA name |
-| Swap (zRAM / SD card) | wired in, zRAM untested |
+| Swap (zRAM / SD card) | SD card tested by hand, ROM build pending |
 
 ## Repositories
 
@@ -219,9 +219,9 @@ Everything the port needs is on GitHub under `MicahOttah`.
    the entry point.  `libmmcamera_sw_tnr.so` does not exist for any device
    in the tree.
 4. **The swap feature is not finished.**  The daemon, its build, its init
-   service and its SELinux policy are all in the tree now, so the zRAM
-   backend is in the next build - but it has not been built or tested on
-   the device yet, and the SD-card backend and the Settings UI are still
+   service and its SELinux policy (zRAM and SD card) are in the tree, and
+   the SD-card swap was switched on by hand on the device - but no ROM
+   with the service has been installed yet, and the Settings UI is still
    open.  See *Swap*.
 
 ## The build revision
@@ -272,14 +272,17 @@ overwritten by a ROM build.  Three things protect it:
 
 ## Swap
 
-*Work in progress.*  The daemon, its build file (`swap/Android.bp`), its
-init service (`v521swap` in `rootdir/etc/init.target.rc`) and its SELinux
-policy (`sepolicy/swap.te`, `property.te`, the `file_contexts` and
-`property_contexts` entries) are all in the tree, so the **zRAM backend is
-in the next build**.  Still open: a build and an on-device test, the
-**SD-card backend's device labelling** (the swap partition needs the
-`swap_block_device` label before the enforcing policy will let the daemon
-open it), and the **Settings UI**.
+*Work in progress.*  The daemon, its build file (`swap/Android.bp`,
+registered through `subdirs` in `Android.bp`), its init service
+(`v521swap` in `rootdir/etc/init.target.rc`) and its SELinux policy
+(`sepolicy/swap.te`, `property.te`, the `file_contexts` and
+`property_contexts` entries) are all in the tree.
+
+**Tested so far:** the daemon binary, run by hand from a root shell on
+build 17, found the SD-card swap partition and activated it
+(`/dev/block/mmcblk1p2`, 2 GiB, priority 100).  **Not yet tested:** the
+service and the confined `v521swap` domain in an installed ROM, and the
+zRAM backend.  **Still open:** the Settings UI.
 
 The plan is a user-configurable swap in *Settings -> System -> LineageParts*,
 with three properties as the interface:
@@ -312,21 +315,34 @@ Two details are specific to this kernel:
   `/sys/block/zram0/reset` after `swapoff` before a new `disksize` is set
   (`drivers/block/zram/zram_drv.c:872`).  The compressor is `lzo`.
 
-The SD-card backend needs a second partition at the end of the card.  The
-card is 7.5 GiB with one FAT32 partition that covers it to the last sector,
-and the data ends at cluster 40 295 (about 1.23 GiB), so a 2 GiB tail
-partition is safe.  The repartitioning is done on the host with the card
-unmounted and the content backed up first; the on-device daemon only
-activates a partition that has been prepared.
+The SD-card backend needs a swap partition (MBR type `0x82`) as
+**partition 2** of the card.  The partitioning is done on the host with
+the card in a reader; the on-device daemon only activates a partition that
+has been prepared.
+
+* `bin/sdcard-swap /dev/sdX [--commit [--no-backup]]` shrinks the FAT32
+  partition in place with `fatresize` and adds the swap partition behind
+  it.  On the 7.5 GiB card `fatresize` 1.1.0 aborted with
+  `*** buffer overflow detected ***` (it wrote nothing), so
+* `bin/sdcard-rebuild /dev/sdX <dir>` is the fallback that was used: it
+  writes the new table (FAT32 5631 MiB + swap 2048 MiB), recreates the
+  FAT32 **with the old volume serial** (so Android still sees the same
+  `/storage/104D-0D10`), copies the files back from a verified copy and
+  compares every file byte for byte.
 
 The SELinux side (`sepolicy/swap.te`) is a new `v521swap` domain created
 with `init_daemon_domain`, holding `capability sys_admin` for `swapon()`,
 `ram_device:blk_file rw` for `/dev/block/zram0` (the platform already
 labels the zRAM nodes `ram_device`), `sysfs_zram:file rw` for the zRAM
-control files, `proc:file r` for `/proc/swaps`, `urandom_device:chr_file
-r` for the header uuid, and `set_prop` on the new `v521_swap_prop` type.
-The SD-card swap partition is not labelled `swap_block_device` yet, so
-only the zRAM backend is reachable from the enforcing policy so far.
+control files, `proc:file r` for `/proc/swaps`, `random_device:chr_file
+r` for the header uuid (the label `/dev/urandom` carries), and `set_prop`
+on the new `v521_swap_prop` type.  Both backends need `search` on the
+`/dev/block` directory (`block_device:dir`).  For the SD card,
+`file_contexts` labels `/dev/block/mmcblk1p2` as `swap_block_device` (the
+platform type for swap areas; otherwise it is a generic `block_device`
+node that only init may open), the daemon gets `rw` on it and `r` on the
+whole-disk node `/dev/block/mmcblk1` (`sd_device`, from CAF) to read the
+MBR.
 
 To drive it by hand during bring-up (the Settings UI does the same):
 
@@ -336,6 +352,9 @@ To drive it by hand during bring-up (the Settings UI does the same):
     adb shell getprop v521.swap.status      # -> on:zram:402653184
     adb shell cat /proc/swaps
     adb shell setprop persist.v521.swap.enabled 0   # turn it back off
+
+For the SD card use `backend sdcard` (or `both`); the status then reads
+`on:sdcard:<bytes>`.
 
 ## Bring-up settings
 

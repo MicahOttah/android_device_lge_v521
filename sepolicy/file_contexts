@@ -90,3 +90,8 @@
 /system/bin/time_daemon                    u:object_r:time_daemon_exec:s0
 /system/bin/wcnss_service                  u:object_r:wcnss_service_exec:s0
 /system/bin/v521swap                       u:object_r:v521swap_exec:s0
+
+# The swap partition on the SD card (partition 2, type 0x82, made by
+# bin/sdcard-swap or bin/sdcard-rebuild).  Without this it is a generic
+# block_device node, which no daemon but init may open.  See sepolicy/swap.te.
+/dev/block/mmcblk1p2                       u:object_r:swap_block_device:s0

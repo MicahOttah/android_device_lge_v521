@@ -79,6 +79,9 @@
  *     (kernel/lge/msm8952/drivers/block/zram/zram_drv.c:872).
  */
 
+/* Must come before <log/log.h>, which supplies a default LOG_TAG. */
+#define LOG_TAG "v521swap"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -88,6 +91,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <linux/fs.h>       /* BLKGETSIZE64 */
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -100,8 +104,6 @@
  * declares __android_log_print and would leave the ALOG* macros
  * undefined. */
 #include <log/log.h>
-
-#define LOG_TAG "v521swap"
 
 /* ------------------------------------------------------------------ */
 /* Configuration                                                       */
@@ -204,8 +206,18 @@ static void sleep_seconds(unsigned int seconds) {
     }
 }
 
+/*
+ * __system_property_get() always writes up to PROP_VALUE_MAX bytes, so it
+ * must not be handed a smaller buffer (reconcile() passes a 32 byte one).
+ * Read into a full-size buffer and copy back only what fits.
+ */
 static int prop_get(const char *name, char *value, size_t len) {
-    return __system_property_get(name, value) > 0 ? 0 : -1;
+    char buf[PROP_VALUE_MAX];
+
+    if (len == 0 || __system_property_get(name, buf) <= 0)
+        return -1;
+    snprintf(value, len, "%s", buf);
+    return 0;
 }
 
 static int prop_get_int(const char *name, int fallback) {
@@ -320,15 +332,6 @@ static int read_swap_table(struct swap_entry *entries, int max_entries) {
 
     fclose(fp);
     return count;
-}
-
-static int swap_table_has(const struct swap_entry *entries, int count, const char *device) {
-    int i;
-    for (i = 0; i < count; i++) {
-        if (strcmp(entries[i].device, device) == 0)
-            return 1;
-    }
-    return 0;
 }
 
 static unsigned long long swap_table_size_of(const struct swap_entry *entries, int count,
@@ -536,16 +539,11 @@ static unsigned long long device_size(const char *path) {
     if (fd < 0)
         return 0;
 
-#ifdef BLKGETSIZE64
+    /* BLKGETSIZE64 (from <linux/fs.h>) returns the size as 64 bits.  An
+     * lseek() fallback would fail with EOVERFLOW here: off_t is 32 bits on
+     * this armv7 userspace and a 2 GiB partition is one byte too large. */
     if (ioctl(fd, BLKGETSIZE64, &size) != 0)
         size = 0;
-#else
-    {
-        off_t end = lseek(fd, 0, SEEK_END);
-        if (end > 0)
-            size = (unsigned long long)end;
-    }
-#endif
 
     close(fd);
     return size;
@@ -721,8 +719,10 @@ static void reconcile(void) {
     } else if (active_zram) {
         snprintf(status, sizeof(status), "on:%s:%" PRIu64, BACKEND_ZRAM, zram_size);
     } else if (active_sdcard) {
+        /* entries[] was read before a swapon in this pass, so it may not
+         * list the partition yet - report the size of the device itself. */
         snprintf(status, sizeof(status), "on:%s:%" PRIu64, BACKEND_SDCARD,
-                 swap_table_size_of(entries, count, sd_device));
+                 device_size(sd_device));
     } else {
         snprintf(status, sizeof(status), "error:swapon-failed");
     }

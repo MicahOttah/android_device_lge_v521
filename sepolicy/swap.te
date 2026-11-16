@@ -29,24 +29,28 @@ allow v521swap sysfs_zram:file rw_file_perms;
 # by the catch-all "genfscon proc / u:object_r:proc:s0".
 allow v521swap proc:file r_file_perms;
 
-# The uuid written into the swap header is read from /dev/urandom.
-allow v521swap urandom_device:chr_file r_file_perms;
+# The uuid written into the swap header is read from /dev/urandom, which
+# this policy labels random_device (shared with /dev/random).
+allow v521swap random_device:chr_file r_file_perms;
 
 # Read the configuration (persist.v521.swap.enabled / backend / size) and
 # publish the result in v521.swap.status.  set_prop() grants both the
 # property_service:set and the read of the property type.
 set_prop(v521swap, v521_swap_prop)
 
-###########################################################################
-# SD-card backend (backend = sdcard | both) - not reachable yet.
+# Both backends name their node under /dev/block, a directory of type
+# block_device; looking a node up needs search on it.  This is the
+# directory only - opening a block_device *node* stays forbidden
+# (system/sepolicy/public/domain.te).
+allow v521swap block_device:dir search;
+
+# SD-card backend (backend = sdcard | both).
 #
-# The daemon reads the partition table from the whole-disk node
-# /dev/block/mmcblk1 and writes the swap header to the type-0x82 partition
-# on it.  Those nodes are not labelled for swap in this policy yet (the
-# whole disk is "sd_device" and the partitions fall through to the generic
-# block_device type, which domain.te forbids a non-init domain to open),
-# so the SD-card path currently ends in an "error:" status instead of a
-# denial.  The default zram backend needs none of this.  Labelling the SD
-# swap partition as swap_block_device and granting rw_file_perms here is
-# the remaining work; see README.md "Swap".
-###########################################################################
+# The daemon reads the MBR from the whole-disk node /dev/block/mmcblk1
+# (labelled sd_device by device/qcom/sepolicy) to find the type-0x82
+# partition, then writes the swap header to that partition and swaps it on.
+# The card is laid out by bin/sdcard-swap / bin/sdcard-rebuild with the
+# swap partition as partition 2, which sepolicy/file_contexts labels
+# swap_block_device - the platform type meant for swap areas.
+allow v521swap sd_device:blk_file r_file_perms;
+allow v521swap swap_block_device:blk_file rw_file_perms;

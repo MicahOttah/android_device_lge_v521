@@ -1,3 +1,9 @@
+// Soong in 8.1 only scans device/*/*/Android.bp (the optional_subdirs
+// glob of the top-level Android.bp); deeper Android.bp files are read
+// only when a parent lists them here.  Without this the v521swap module
+// is never defined and PRODUCT_PACKAGES drops it silently.
+subdirs = ["swap"]
+
 // Shim library that provides the two network helpers that LG's CAF blob
 // libwqe.so takes from AOSP's libandroid.so.
 //
