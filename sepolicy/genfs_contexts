@@ -14,3 +14,21 @@
 # This is the same label CAF uses for this entry, see
 # device/qcom/sepolicy/legacy-common/genfs_contexts.
 genfscon debugfs /rmt_storage u:object_r:debugfs_rmt:s0
+
+# The consumer infrared transmitter of the LGE SPI IR driver.
+#
+# sysfs is a "genfs" superblock as far as SELinux is concerned: the
+# kernel derives the label of every sysfs inode from a genfscon lookup
+# (security_genfs_sid) and not from a path based file_contexts match,
+# so a file_contexts entry for /sys/... would never take effect here.
+#
+# The path used for the lookup is relative to the filesystem root, so
+# /sys/devices/soc.0/7af6000.spi/spi_master/spi6/spi6.0/ir_data is
+# matched as
+# /devices/soc.0/7af6000.spi/spi_master/spi6/spi6.0/ir_data.
+#
+# The lookup takes the longest matching prefix, so the entries for the
+# two attributes win over the catch all "genfscon sysfs /" and the
+# directory they live in keeps the generic sysfs label.
+genfscon sysfs /devices/soc.0/7af6000.spi/spi_master/spi6/spi6.0/ir_data u:object_r:sysfs_ir:s0
+genfscon sysfs /devices/soc.0/7af6000.spi/spi_master/spi6/spi6.0/ir_state u:object_r:sysfs_ir:s0

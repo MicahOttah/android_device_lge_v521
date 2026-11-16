@@ -23,3 +23,13 @@ type debugfs_rmt, debugfs_type, fs_type;
 #
 # See sepolicy/dpmd.te and notes/2026-11-16-dpm-nsrm.md.
 type dpm_conf_file, file_type;
+
+# The consumer infrared transmitter of the LGE SPI IR driver.
+#
+# The driver exposes two sysfs attributes (ir_data and ir_state) that
+# the IR HAL has to read and write.  Giving them their own type keeps
+# the access of the HAL limited to the IR interface; the generic sysfs
+# type would hand it write access to every sysfs node of the device.
+#
+# See sepolicy/ir.te and sepolicy/genfs_contexts.
+type sysfs_ir, fs_type, sysfs_type;

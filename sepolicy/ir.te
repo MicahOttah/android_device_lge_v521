@@ -1,0 +1,29 @@
+# Consumer infrared (IR) transmitter
+#
+# The IR HAL (android.hardware.ir@1.0-service, domain hal_ir_default)
+# drives the LGE "sdc_spi_ir" SPI IR driver through its sysfs
+# attributes.  The CAF blob consumerir.msm8952.so opens
+#
+#   /sys/class/spi_master/spi6/spi6.0/ir_data
+#
+# and writes the carrier/modulation pattern into it; the framework then
+# reports "ConsumerIrService: Error transmitting: -1" when the open
+# fails, because the blob logs "Can't open sysfs file ...".
+#
+# AOSP gives hal_ir_default no access to sysfs at all
+# (system/sepolicy/public/hal_ir.te only covers the HIDL binder calls),
+# so the HAL was never allowed to open the node and no IR signal was
+# emitted at all.
+#
+# The two attributes carry their own type (sysfs_ir, see sepolicy/file.te
+# and sepolicy/genfs_contexts) so that the permission stays limited to
+# the IR interface instead of opening up all of sysfs for the HAL.
+allow hal_ir_default sysfs_ir:file { getattr open read write };
+
+# The HAL runs as the "system" user, and the driver creates the
+# attributes as root:root 0660, so init has to hand them over - see
+# rootdir/etc/init.target.rc.  init already has setattr on the sysfs
+# attributes through
+#   allow init { fs_type -contextmount_type -sdcard_type -rootfs }:file
+#          { open read setattr };
+# (system/sepolicy/public/init.te), no extra rule is needed for that.

@@ -45,6 +45,18 @@ on fs
     mount_all fstab.qcom
     write /proc/sys/vm/swappiness 100
 
+    # LGE SPI IRRC
+    #
+    # The IR HAL (android.hardware.ir@1.0-service) runs as the system
+    # user and drives the SPI IR driver through these two sysfs
+    # attributes, but the driver creates them as root:root 0660.  Without
+    # the hand-over the HAL gets EACCES, the CAF blob logs "Can't open
+    # sysfs file ..." and no IR signal is emitted at all.
+    #
+    # The stock LG ROM does the same in its init.b3_product.rc.
+    chown system system /sys/class/spi_master/spi6/spi6.0/ir_data
+    chown system system /sys/class/spi_master/spi6/spi6.0/ir_state
+
     mkdir /persist/data 0700 system system
 
     restorecon_recursive /dsp
