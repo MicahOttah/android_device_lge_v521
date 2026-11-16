@@ -30,17 +30,26 @@
  *             partition has to be created once with bin/sdcard-swap on
  *             the host; this daemon only activates it.
  *
- * The configuration comes from three system properties, which the
- * "Swap settings" page of LineageParts writes:
+ * The configuration comes from system properties, which the "Swap
+ * settings" page of LineageParts writes:
  *
- *   persist.v521.swap.enabled   "1" to have swap active, "0" otherwise
- *   persist.v521.swap.backend   "zram" | "sdcard" | "both"
- *   persist.v521.swap.size      zram size in bytes
+ *   persist.v521.swap.enabled          "1" to have swap active, "0" otherwise
+ *   persist.v521.swap.backend          "zram" | "sdcard" | "both"
+ *   persist.v521.swap.size             zram size in bytes (64 MiB..1 GiB)
+ *   persist.v521.swap.zram_priority    0..32767, default 1000
+ *   persist.v521.swap.sdcard_priority  0..32767, default 100
+ *                                      (higher is used first; equal
+ *                                      priorities stripe across both)
+ *   persist.v521.swap.reclaim          "auto" (default: on while zram is
+ *                                      active) | "on" | "off" - Qualcomm
+ *                                      process reclaim
+ *   persist.v521.swap.swappiness       0..100; unset leaves the kernel value
  *
  * The daemon publishes what it did in one property:
  *
- *   v521.swap.status            "off" | "on:<backend>:<bytes>" |
- *                               "error:<reason>"
+ *   v521.swap.status   "off" | "error:<reason>" |
+ *                      "on:zram=<bytes>,sdcard=<bytes>|missing|failed"
+ *                      (one item per backend that is asked for)
  *
  * and it reconciles the desired state every few seconds, so a swap
  * partition that appears later (the user inserts the card) is picked up
@@ -112,6 +121,10 @@
 #define PROP_ENABLED    "persist.v521.swap.enabled"
 #define PROP_BACKEND    "persist.v521.swap.backend"
 #define PROP_SIZE       "persist.v521.swap.size"
+#define PROP_ZRAM_PRIO  "persist.v521.swap.zram_priority"    /* 0..32767 */
+#define PROP_SD_PRIO    "persist.v521.swap.sdcard_priority"  /* 0..32767 */
+#define PROP_RECLAIM    "persist.v521.swap.reclaim"          /* auto|on|off */
+#define PROP_SWAPPINESS "persist.v521.swap.swappiness"       /* 0..100, unset = leave */
 #define PROP_STATUS     "v521.swap.status"
 
 #define BACKEND_ZRAM    "zram"
@@ -141,8 +154,20 @@
 #define V521_SWAP_FLAG_PRIO_MASK  0x7fff
 #define V521_SWAP_FLAG_PRIO_SHIFT 0
 
+/*
+ * Default priorities: the kernel fills the swap area with the higher
+ * priority first and only spills into a lower one when it is full, so
+ * zram (fast, in RAM) is used first and the SD card is the overflow.
+ * Equal priorities make the kernel stripe pages across both.
+ */
 #define SWAP_PRIO_ZRAM    1000
 #define SWAP_PRIO_SDCARD  100
+#define SWAP_PRIO_MAX     32767
+
+/* Qualcomm per-process reclaim: pushes the anonymous memory of background
+ * apps into swap ahead of time (labelled sysfs_process_reclaim by CAF). */
+#define PROCESS_RECLAIM "/sys/module/process_reclaim/parameters/enable_process_reclaim"
+#define VM_SWAPPINESS   "/proc/sys/vm/swappiness"
 
 #define ZRAM_DEV        "/dev/block/zram0"
 #define ZRAM_SYSFS      "/sys/block/zram0"
@@ -334,16 +359,6 @@ static int read_swap_table(struct swap_entry *entries, int max_entries) {
     return count;
 }
 
-static unsigned long long swap_table_size_of(const struct swap_entry *entries, int count,
-                                             const char *device) {
-    int i;
-    for (i = 0; i < count; i++) {
-        if (strcmp(entries[i].device, device) == 0)
-            return entries[i].size_kb * 1024ULL;
-    }
-    return 0;
-}
-
 /* ------------------------------------------------------------------ */
 /* Kernel calls                                                        */
 /* ------------------------------------------------------------------ */
@@ -451,8 +466,31 @@ static int zram_reset(void) {
     return 0;
 }
 
+/* Read a small numeric file (sysfs / procfs); -1 if it cannot be read. */
+static long long read_number(const char *path) {
+    char buf[64];
+    ssize_t got;
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+
+    if (fd < 0)
+        return -1;
+    got = read(fd, buf, sizeof(buf) - 1);
+    close(fd);
+    if (got <= 0)
+        return -1;
+    buf[got] = '\0';
+    return strtoll(buf, NULL, 10);
+}
+
 static int zram_configure(unsigned long long size) {
     char value[32];
+
+    /* The number of compression streams is only accepted while the device
+     * is still uninitialised, i.e. before disksize (EINVAL afterwards).
+     * Older zram drivers do not have the attribute at all, so a failure
+     * here is not fatal. */
+    if (access(ZRAM_STREAMS, F_OK) == 0 && write_sysfs(ZRAM_STREAMS, "4") != 0)
+        ALOGW("zram: could not set max_comp_streams, using the default");
 
     snprintf(value, sizeof(value), "%" PRIu64, size);
     if (write_sysfs(ZRAM_DISKSIZE, value) != 0) {
@@ -460,13 +498,10 @@ static int zram_configure(unsigned long long size) {
         return -1;
     }
 
-    /* More compression streams help when several pages are in flight. */
-    write_sysfs(ZRAM_STREAMS, "4");
-
     return 0;
 }
 
-static int zram_activate(unsigned long long size) {
+static int zram_activate(unsigned long long size, int priority) {
     /* A device that was used before has to be reset before the size can
      * be set again (the driver refuses disksize 0 and an already
      * initialised device). */
@@ -478,7 +513,7 @@ static int zram_activate(unsigned long long size) {
     if (write_swap_header(ZRAM_DEV, size) != 0)
         return -1;
 
-    return do_swapon(ZRAM_DEV, SWAP_PRIO_ZRAM);
+    return do_swapon(ZRAM_DEV, priority);
 }
 
 /* ------------------------------------------------------------------ */
@@ -589,11 +624,61 @@ static int find_sd_swap(char *out, size_t out_len) {
     return -1;
 }
 
-static int sdcard_activate(const char *device, unsigned long long size) {
+static int sdcard_activate(const char *device, unsigned long long size, int priority) {
     if (write_swap_header(device, size) != 0)
         return -1;
 
-    return do_swapon(device, SWAP_PRIO_SDCARD);
+    return do_swapon(device, priority);
+}
+
+static int is_sd_partition(const char *device) {
+    return strncmp(device, SD_PART_PREFIX, SD_PART_PREFIX_LEN) == 0;
+}
+
+static int prop_get_prio(const char *name, int fallback) {
+    int prio = prop_get_int(name, fallback);
+    if (prio < 0)
+        prio = 0;
+    if (prio > SWAP_PRIO_MAX)
+        prio = SWAP_PRIO_MAX;
+    return prio;
+}
+
+/*
+ * Process reclaim and swappiness.  "auto" (the default) turns process
+ * reclaim on only while zram is active: proactive swapping into RAM is
+ * cheap, into the SD card it is slow and wears the card.  An unset
+ * swappiness property leaves the kernel value alone (init.target.rc sets
+ * 100).
+ */
+static void apply_vm_tuning(int active_zram) {
+    char reclaim[16];
+    int want_reclaim;
+    int swappiness;
+
+    if (prop_get(PROP_RECLAIM, reclaim, sizeof(reclaim)) != 0)
+        snprintf(reclaim, sizeof(reclaim), "auto");
+    if (strcmp(reclaim, "on") == 0)
+        want_reclaim = 1;
+    else if (strcmp(reclaim, "off") == 0)
+        want_reclaim = 0;
+    else
+        want_reclaim = active_zram;
+
+    if (access(PROCESS_RECLAIM, F_OK) == 0 &&
+        read_number(PROCESS_RECLAIM) != want_reclaim) {
+        if (write_sysfs(PROCESS_RECLAIM, want_reclaim ? "1" : "0") == 0)
+            ALOGI("process reclaim %s", want_reclaim ? "on" : "off");
+    }
+
+    swappiness = prop_get_int(PROP_SWAPPINESS, -1);
+    if (swappiness >= 0 && swappiness <= 100 &&
+        read_number(VM_SWAPPINESS) != swappiness) {
+        char value[8];
+        snprintf(value, sizeof(value), "%d", swappiness);
+        if (write_sysfs(VM_SWAPPINESS, value) == 0)
+            ALOGI("swappiness %d", swappiness);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -618,6 +703,7 @@ static void reconcile(void) {
     int enabled = prop_get_int(PROP_ENABLED, 0);
     char backend[32];
     unsigned long long zram_size;
+    int zram_prio, sd_prio;
     int want_zram = 0, want_sdcard = 0;
     char sd_device[PATH_MAX];
     int sd_available = 0;
@@ -633,16 +719,26 @@ static void reconcile(void) {
         zram_size = MIN_ZRAM_SIZE;
     if (zram_size > MAX_ZRAM_SIZE)
         zram_size = MAX_ZRAM_SIZE;
+    /* whole pages only, so that the driver's disksize matches exactly */
+    zram_size -= zram_size % PAGE_SIZE_4K;
+
+    zram_prio = prop_get_prio(PROP_ZRAM_PRIO, SWAP_PRIO_ZRAM);
+    sd_prio = prop_get_prio(PROP_SD_PRIO, SWAP_PRIO_SDCARD);
 
     if (!enabled) {
+        int had_zram = 0;
         count = read_swap_table(entries, MAX_SWAP_ENTRIES);
         for (i = 0; i < count; i++) {
-            if (strcmp(entries[i].device, ZRAM_DEV) == 0 ||
-                strncmp(entries[i].device, "/dev/block/mmcblk1p", 21) == 0)
+            if (strcmp(entries[i].device, ZRAM_DEV) == 0) {
                 do_swapoff(entries[i].device);
+                had_zram = 1;
+            } else if (is_sd_partition(entries[i].device)) {
+                do_swapoff(entries[i].device);
+            }
         }
-        if (count > 0)
+        if (had_zram)
             zram_reset();
+        apply_vm_tuning(0);
         publish("off");
         return;
     }
@@ -675,19 +771,23 @@ static void reconcile(void) {
                 zram_reset();
                 continue;
             }
-            if (swap_table_size_of(entries, count, ZRAM_DEV) != zram_size) {
-                ALOGI("zram size changed, reactivating");
-                do_swapoff(device);
-                zram_reset();
+            /* /proc/swaps does not count the header page, so compare the
+             * size the driver reports instead. */
+            if (read_number(ZRAM_DISKSIZE) != (long long)zram_size ||
+                entries[i].priority != zram_prio) {
+                ALOGI("zram size or priority changed, reactivating");
+                if (do_swapoff(device) == 0)
+                    zram_reset();
                 continue;
             }
             active_zram = 1;
             continue;
         }
 
-        if (strncmp(device, "/dev/block/mmcblk1p", 21) == 0) {
+        if (is_sd_partition(device)) {
             if (!want_sdcard || !sd_available ||
-                strcmp(device, sd_device) != 0) {
+                strcmp(device, sd_device) != 0 ||
+                entries[i].priority != sd_prio) {
                 do_swapoff(device);
                 continue;
             }
@@ -699,32 +799,48 @@ static void reconcile(void) {
     }
 
     if (want_zram && !active_zram) {
-        if (zram_activate(zram_size) == 0)
+        if (zram_activate(zram_size, zram_prio) == 0)
             active_zram = 1;
     }
 
-    if (want_sdcard && !active_sdcard) {
-        if (!sd_available) {
-            ALOGW("no swap partition on the SD card");
-            publish("error:no-sd-swap-partition");
-            return;
-        }
-        if (sdcard_activate(sd_device, device_size(sd_device)) == 0)
+    /* A missing card is not an error in "both" mode: zram keeps working
+     * and the card is picked up when it is inserted. */
+    if (want_sdcard && !active_sdcard && sd_available) {
+        if (sdcard_activate(sd_device, device_size(sd_device), sd_prio) == 0)
             active_sdcard = 1;
     }
 
-    if (active_zram && active_sdcard) {
-        snprintf(status, sizeof(status), "on:%s,%s:%" PRIu64,
-                 BACKEND_ZRAM, BACKEND_SDCARD, zram_size);
-    } else if (active_zram) {
-        snprintf(status, sizeof(status), "on:%s:%" PRIu64, BACKEND_ZRAM, zram_size);
-    } else if (active_sdcard) {
-        /* entries[] was read before a swapon in this pass, so it may not
-         * list the partition yet - report the size of the device itself. */
-        snprintf(status, sizeof(status), "on:%s:%" PRIu64, BACKEND_SDCARD,
-                 device_size(sd_device));
+    apply_vm_tuning(active_zram);
+
+    /*
+     * Status: "off", "error:<reason>", or "on:" followed by one item per
+     * backend that is wanted, e.g.
+     *   on:zram=536870912,sdcard=2147483648
+     *   on:zram=536870912,sdcard=missing
+     */
+    if (!active_zram && !active_sdcard) {
+        if (want_sdcard && !want_zram && !sd_available)
+            snprintf(status, sizeof(status), "error:no-sd-swap-partition");
+        else
+            snprintf(status, sizeof(status), "error:swapon-failed");
     } else {
-        snprintf(status, sizeof(status), "error:swapon-failed");
+        size_t n = snprintf(status, sizeof(status), "on:");
+        if (want_zram) {
+            if (active_zram)
+                n += snprintf(status + n, sizeof(status) - n, "zram=%" PRIu64, zram_size);
+            else
+                n += snprintf(status + n, sizeof(status) - n, "zram=failed");
+        }
+        if (want_sdcard) {
+            if (want_zram)
+                n += snprintf(status + n, sizeof(status) - n, ",");
+            if (active_sdcard)
+                snprintf(status + n, sizeof(status) - n, "sdcard=%" PRIu64,
+                         device_size(sd_device));
+            else
+                snprintf(status + n, sizeof(status) - n, "sdcard=%s",
+                         sd_available ? "failed" : "missing");
+        }
     }
 
     publish(status);

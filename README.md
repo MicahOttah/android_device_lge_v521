@@ -285,14 +285,48 @@ service and the confined `v521swap` domain in an installed ROM, and the
 zRAM backend.  **Still open:** the Settings UI.
 
 The plan is a user-configurable swap in *Settings -> System -> LineageParts*,
-with three properties as the interface:
+with system properties as the interface:
 
 | Property | Meaning |
 | --- | --- |
 | `persist.v521.swap.enabled` | `0` or `1` |
 | `persist.v521.swap.backend` | `zram`, `sdcard` or `both` |
-| `persist.v521.swap.size` | the size in bytes |
-| `v521.swap.status` | published by the daemon: `off`, `on:<backend>:<bytes>` or `error:<reason>` |
+| `persist.v521.swap.size` | zRAM size in bytes, 64 MiB - 1 GiB (default 512 MiB) |
+| `persist.v521.swap.zram_priority` | 0 - 32767, default `1000` |
+| `persist.v521.swap.sdcard_priority` | 0 - 32767, default `100` |
+| `persist.v521.swap.reclaim` | `auto` (default: Qualcomm process reclaim on while zRAM is active), `on`, `off` |
+| `persist.v521.swap.swappiness` | 0 - 100; unset leaves the kernel value (`init.target.rc` sets 100) |
+| `v521.swap.status` | published by the daemon: `off`, `error:<reason>`, or `on:` with one item per requested backend, e.g. `on:zram=536870912,sdcard=2147483648` or `on:zram=536870912,sdcard=missing` |
+
+The kernel fills the swap area with the **higher priority first** and only
+spills into a lower one when it is full; equal priorities stripe pages
+across both.  So the defaults make zRAM the fast first tier and the SD card
+the overflow.  A priority change is applied by swapping the area off and
+on again (pages are read back in first).  In `both` mode a missing card is
+not an error - zRAM keeps working and the card is picked up when inserted.
+
+**Do not remove the SD card while it holds swap.**  Pages that were
+swapped out to it are gone, and the apps they belong to crash when they
+touch them.  Turn swap off (or switch to zRAM only) first.
+
+### Settings page (planned, LineageParts)
+
+| Control | Writes | Choices |
+| --- | --- | --- |
+| Use swap | `enabled` | on / off |
+| Mode | `backend` | Compressed RAM (zRAM) / SD card / zRAM + SD card |
+| Order (mode zRAM + SD card only) | `zram_priority`, `sdcard_priority` | zRAM first, SD card as overflow (1000 / 100, default) / SD card first (100 / 1000) / Spread across both (100 / 100) |
+| zRAM size | `size` | 256 / 384 / 512 / 768 / 1024 MiB |
+| Proactive reclaim | `reclaim` | Automatic (with zRAM) / Always / Never |
+| Swappiness | `swappiness` | Kernel default / 30 / 60 / 100 |
+| Status (read only) | reads `v521.swap.status` and `/proc/swaps` | e.g. "zRAM 512 MB, 12 MB used - SD card 2 GB, 0 MB used" or "SD card: no swap partition" |
+
+The page only reads and writes these properties; it needs no privilege
+beyond `set_prop` on `v521_swap_prop`, which `sepolicy/property.te`
+already grants to `system_app` - the domain LineageParts runs in
+(platform signed, `android.uid.system`).  The numeric priorities stay
+available through `adb shell setprop` for anything the presets do not
+cover.
 
 A dedicated `v521swap` daemon reconciles the state every five seconds from
 those properties, so the user can turn swap on and off at any time and the
@@ -349,12 +383,13 @@ To drive it by hand during bring-up (the Settings UI does the same):
     adb shell setprop persist.v521.swap.backend zram
     adb shell setprop persist.v521.swap.size $((384 * 1024 * 1024))
     adb shell setprop persist.v521.swap.enabled 1
-    adb shell getprop v521.swap.status      # -> on:zram:402653184
+    adb shell getprop v521.swap.status      # -> on:zram=402653184
     adb shell cat /proc/swaps
     adb shell setprop persist.v521.swap.enabled 0   # turn it back off
 
-For the SD card use `backend sdcard` (or `both`); the status then reads
-`on:sdcard:<bytes>`.
+For the SD card use `backend sdcard`, or `both` for zRAM first with the
+card as overflow; the status then reads
+`on:zram=<bytes>,sdcard=<bytes>`.
 
 ## Bring-up settings
 

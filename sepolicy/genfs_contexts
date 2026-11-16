@@ -32,3 +32,8 @@ genfscon debugfs /rmt_storage u:object_r:debugfs_rmt:s0
 # directory they live in keeps the generic sysfs label.
 genfscon sysfs /devices/soc.0/7af6000.spi/spi_master/spi6/spi6.0/ir_data u:object_r:sysfs_ir:s0
 genfscon sysfs /devices/soc.0/7af6000.spi/spi_master/spi6/spi6.0/ir_state u:object_r:sysfs_ir:s0
+
+# vm.swappiness gets its own type so that the swap daemon can set it
+# without write access to all of /proc (sepolicy/swap.te).  procfs is a
+# genfs superblock like sysfs, and the path is relative to /proc.
+genfscon proc /sys/vm/swappiness u:object_r:proc_swappiness:s0

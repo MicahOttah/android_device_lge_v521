@@ -24,6 +24,21 @@ allow v521swap ram_device:blk_file rw_file_perms;
 # (system/sepolicy/public/file.te, .../private/genfs_contexts).
 allow v521swap sysfs_zram:dir search;
 allow v521swap sysfs_zram:file rw_file_perms;
+# /sys/block/zram0 is a symlink into /sys/devices/virtual/block, and the
+# path walk goes through generic sysfs directories.
+allow v521swap sysfs:dir search;
+allow v521swap sysfs:lnk_file read;
+
+# Qualcomm process reclaim on/off (persist.v521.swap.reclaim; "auto" = on
+# while zram is active).  The node already has its own CAF type.
+allow v521swap sysfs_process_reclaim:file rw_file_perms;
+
+# vm.swappiness (persist.v521.swap.swappiness), labelled proc_swappiness in
+# sepolicy/genfs_contexts so that the daemon does not need write access to
+# all of /proc.  init writes the boot value (init.target.rc).
+allow v521swap proc_swappiness:file rw_file_perms;
+allow v521swap proc:dir search;
+allow init proc_swappiness:file w_file_perms;
 
 # /proc/swaps, to reconcile against what is already active.  It is covered
 # by the catch-all "genfscon proc / u:object_r:proc:s0".

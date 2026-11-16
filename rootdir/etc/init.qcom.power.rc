@@ -145,8 +145,9 @@ on enable-low-power
     # Enable timer migration to little cluster
     write /proc/sys/kernel/power_aware_timer_migration 1
 
-    # Process reclaim
-    write /sys/module/process_reclaim/parameters/enable_process_reclaim 1
+    # Process reclaim.  It is switched on and off by the v521swap daemon
+    # (persist.v521.swap.reclaim, default: on while zram is active), since
+    # it only makes sense with swap; only the tuning is set here.
     write /sys/module/process_reclaim/parameters/pressure_min 10
     write /sys/module/process_reclaim/parameters/per_swap_size 1024
 

@@ -33,3 +33,8 @@ type dpm_conf_file, file_type;
 #
 # See sepolicy/ir.te and sepolicy/genfs_contexts.
 type sysfs_ir, fs_type, sysfs_type;
+
+# vm.swappiness, written by init at boot and by the v521swap daemon
+# (persist.v521.swap.swappiness).  Same pattern as the platform's
+# proc_drop_caches / proc_overcommit_memory.  See sepolicy/swap.te.
+type proc_swappiness, fs_type;
