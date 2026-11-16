@@ -24,7 +24,7 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | DPM (`dpmd`) | working - daemon running, NSRM in place |
 | Widevine | working - **L1** (hardware backed) under enforcing |
 | IR | working - the LED transmits (checked with a camera); needs the IR clock table in the kernel |
-| USB diag port | working - in the `adb`, MTP and PTP modes, the modem answers |
+| USB diag port | working - only while USB debugging is enabled (`adb`, `mtp,adb`, `ptp,adb`); the modem answers |
 | TWRP recovery | working - built from this tree, protected |
 | Build revision | working - `v521-15.1-buildN` in the build number and in the OTA name |
 | Swap (zRAM / SD card) | in progress |
@@ -168,15 +168,17 @@ Everything the port needs is on GitHub under `MicahOttah`.
   bus, under SELinux enforcing and without a denial.  LG's own IR service
   is not built for the v521 - see *Known issues*.
 * **The diag port on USB.**  The serial (`acm`) and Qualcomm `diag`
-  interfaces that QPST and QXDM use are part of every USB mode with a data
-  connection: `adb`, MTP and PTP, each with or without adb.  The MTP modes
-  used to have two USB configurations with the diag interface only in the
-  second one, which a host does not select by itself, and the PTP modes had
-  none.  Checked from a Linux host by sending the diag version, build id
-  and status requests to the interface in the `adb`, `mtp,adb` and
-  `ptp,adb` modes: the modem answers in each.  Not checked: QPST/QXDM on
-  Windows.  The interface number of the diag port is 2 in the `adb` mode
-  and 3 in the MTP and PTP modes.
+  interfaces that QPST and QXDM use are presented **only while USB
+  debugging is enabled** (Developer options): in the `adb`, `mtp,adb`,
+  `ptp,adb` and `rndis,adb` modes.  With USB debugging off, the MTP, PTP
+  and tethering modes carry nothing but their own function.  The MTP mode
+  used to have two USB configurations with the diag interface in the
+  second one, which a host does not select by itself.  Checked from a
+  Linux host by sending the diag version, build id and status requests to
+  the interface in the `adb`, `mtp,adb` and `ptp,adb` modes: the modem
+  answers in each.  Not checked: QPST/QXDM on Windows.  The interface
+  number of the diag port is 2 in the `adb` mode and 3 in the MTP and PTP
+  modes.
 
   These two fixes are in the tree and were tested with a boot image built
   from it; they are not part of a numbered release build yet.
