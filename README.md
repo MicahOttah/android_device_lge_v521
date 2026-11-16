@@ -23,7 +23,8 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | Wi-Fi | working |
 | DPM (`dpmd`) | working - daemon running, NSRM in place |
 | Widevine | working - **L1** (hardware backed) under enforcing |
-| IR | working - AOSP service + the CAF `consumerir.msm8952.so` blob |
+| IR | working - the LED transmits (checked with a camera); needs the IR clock table in the kernel |
+| USB diag port | working - in the `adb`, MTP and PTP modes, the modem answers |
 | TWRP recovery | working - built from this tree, protected |
 | Build revision | working - `v521-15.1-buildN` in the build number and in the OTA name |
 | Swap (zRAM / SD card) | in progress |
@@ -38,7 +39,7 @@ Everything the port needs is on GitHub under `MicahOttah`.
 | [`proprietary_vendor_lge`](https://github.com/MicahOttah/proprietary_vendor_lge) | `lineage-15.1` | The v521 blobs: CAF protobuf rename, OEM crypto library, DPM daemon. |
 | [`android_device_lge_common`](https://github.com/MicahOttah/android_device_lge_common) | `lineage-15.1-v521` | Skips LG's own consumer IR service for the v521. |
 | [`android_system_core`](https://github.com/MicahOttah/android_system_core) | `lineage-15.1-v521` | Stops the system from overwriting the recovery partition. |
-| [`android_kernel_lge_msm8952`](https://github.com/MicahOttah/android_kernel_lge_msm8952) | `lineage-15.1-v521` | The 64-bit `get_user()` path, no 32-bit binder. |
+| [`android_kernel_lge_msm8952`](https://github.com/MicahOttah/android_kernel_lge_msm8952) | `lineage-15.1-v521` | The 64-bit `get_user()` path, no 32-bit binder, the IR carrier rates of the SPI clock. |
 | [`android_vendor_lineage`](https://github.com/MicahOttah/android_vendor_lineage) | `lineage-15.1-v521` | `WITH_ADB_INSECURE=true` support. |
 | [`android_frameworks_base`](https://github.com/MicahOttah/android_frameworks_base) | `lineage-15.1-v521` | The Android-7.0-era compatibility shims for the stock CNE blobs. |
 | [`android_frameworks_native`](https://github.com/MicahOttah/android_frameworks_native) | `lineage-15.1-v521` | Gralloc debug log lines. |
@@ -140,10 +141,45 @@ Everything the port needs is on GitHub under `MicahOttah`.
   against RSA key 0, 994 590 720 bytes were written to `/system`, and
   `/cache/recovery/last_install` says `1` (= `INSTALL_SUCCESS`).  That was
   done for the enforcing ROM itself.
-* **Consumer IR.**  The AOSP `android.hardware.ir@1.0-service` and its
-  implementation run and load the CAF blob `consumerir.msm8952.so`
-  (`/system/lib/hw/`), which drives the transmitter on SPI6.  LG's own IR
-  service is not built for the v521 - see *Known issues*.
+* **Consumer IR.**  The AOSP `android.hardware.ir@1.0-service` loads the
+  CAF blob `consumerir.msm8952.so` (`/system/lib/hw/`), which drives LG's
+  `sdc_spi_ir` transmitter on SPI6 through
+  `/sys/class/spi_master/spi6/spi6.0/ir_data`.  The LED transmits; that was
+  checked by eye through a camera.  Three things had to be fixed, one
+  behind the other:
+
+  1. The driver creates `ir_data` as `root:root 0660` and the HAL runs as
+     `system`.  `init.target.rc` hands `ir_data` and `ir_state` over, as
+     the stock `init.b3_product.rc` does.
+  2. AOSP gives `hal_ir_default` no access to sysfs.  The two attributes
+     get their own type, `sysfs_ir` (`sepolicy/genfs_contexts`,
+     `sepolicy/ir.te`), and the HAL is allowed that type only.
+  3. The kernel had no SPI clock rate for an IR carrier.  The blob writes
+     one 16 bit word per carrier period and the driver passes the carrier
+     frequency itself as the SPI speed; the stock LG kernel resolves that
+     with 84 extra entries in the clock table (the entry *named* 38000 is
+     really 800 MHz / 12 / 97, 18 SPI bit times per carrier period).
+     Without them the kernel logged `msm_spi_clock_set: no match found for
+     requested clock frequency:38000` and a 500 ms frame left the LED in
+     10 ms.  The entries were read out of the stock kernel and added to
+     the kernel fork for the IR bus only.
+
+  With all three in place a 501 ms pattern at 38 kHz takes 503 ms on the
+  bus, under SELinux enforcing and without a denial.  LG's own IR service
+  is not built for the v521 - see *Known issues*.
+* **The diag port on USB.**  The serial (`acm`) and Qualcomm `diag`
+  interfaces that QPST and QXDM use are part of every USB mode with a data
+  connection: `adb`, MTP and PTP, each with or without adb.  The MTP modes
+  used to have two USB configurations with the diag interface only in the
+  second one, which a host does not select by itself, and the PTP modes had
+  none.  Checked from a Linux host by sending the diag version, build id
+  and status requests to the interface in the `adb`, `mtp,adb` and
+  `ptp,adb` modes: the modem answers in each.  Not checked: QPST/QXDM on
+  Windows.  The interface number of the diag port is 2 in the `adb` mode
+  and 3 in the MTP and PTP modes.
+
+  These two fixes are in the tree and were tested with a boot image built
+  from it; they are not part of a numbered release build yet.
 
 ## What does not work yet
 
@@ -349,11 +385,11 @@ The commits of the port, per repository.
 
 | Repository | Branch | Commits |
 | --- | --- | --- |
-| `android_device_lge_v521` | `lineage-15.1` | `f2c3bf0` bring up 15.1, `e0bd761` README, `c52c2b6` CAF blobs out of the protobuf stack, `566ee0d` CAF RIL logging off, `164f73b` drop the stock CAF libril.so, `7396d7d` port status, `cccc833` SELinux domains for the vendor daemons, `ec68ed8` SELinux enforcing, `bdbf752` README, `baffb98` recovery: /dev/block/bootdevice, `61880ad` DPM daemon, `de4f2e1` ELF string patcher, `83d6ffd` build revision, `fee61f0` Widevine, `bfabf1c` name the build number buildN, `eac79b4` TWRP build files, `e856f33` QuickButton app, `bf51acb` README, `dd2c567` README, `08b0a8c` README, `6bd0bc5` README |
+| `android_device_lge_v521` | `lineage-15.1` | `f2c3bf0` bring up 15.1, `e0bd761` README, `c52c2b6` CAF blobs out of the protobuf stack, `566ee0d` CAF RIL logging off, `164f73b` drop the stock CAF libril.so, `7396d7d` port status, `cccc833` SELinux domains for the vendor daemons, `ec68ed8` SELinux enforcing, `bdbf752` README, `baffb98` recovery: /dev/block/bootdevice, `61880ad` DPM daemon, `de4f2e1` ELF string patcher, `83d6ffd` build revision, `fee61f0` Widevine, `bfabf1c` name the build number buildN, `eac79b4` TWRP build files, `e856f33` QuickButton app, `bf51acb` README, `dd2c567` README, `08b0a8c` README, `6bd0bc5` README, `ed91e28` README, `2146fc9` IR HAL access to the SPI IR driver, `42527cd` diag port in the MTP and PTP modes |
 | `proprietary_vendor_lge` | `lineage-15.1` | `12617af` CAF blobs out of the protobuf stack, `98680e5` drop the stock CAF libril.so, `7dfb70d` vendor modules, `f8f1f62` DPM daemon and libraries, `35b9cc9` OEM crypto library, `ca0b734` README |
 | `android_device_lge_common` | `lineage-15.1-v521` | `7a9c238` skip LG's own consumer IR service, `3f8d7df` README |
 | `android_system_core` | `lineage-15.1-v521` | `5e3b6fb` never overwrite the recovery partition, `373c684` README |
-| `android_kernel_lge_msm8952` | `lineage-15.1-v521` | `55a07099` 64 bit get_user, no 32 bit binder, `8561be9c` README |
+| `android_kernel_lge_msm8952` | `lineage-15.1-v521` | `55a07099` 64 bit get_user, no 32 bit binder, `8561be9c` README, `1665b7e0` README, `c6825292` IR carrier rates in the SPI clock table |
 | `android_vendor_lineage` | `lineage-15.1-v521` | `530bd69` insecure adb, `1be2a6f` README |
 | `android_frameworks_base` | `lineage-15.1-v521` | `11e63f07` 7.0-era compat APIs for the CNE blobs, `e67a0b17` README |
 | `android_frameworks_native` | `lineage-15.1-v521` | `8167e48` gralloc debug log lines |
