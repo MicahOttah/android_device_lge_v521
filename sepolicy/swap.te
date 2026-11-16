@@ -1,0 +1,52 @@
+# v521swap - the on-device swap manager (device/lge/v521/swap/v521swap.c).
+#
+# The tablet has 2 GB of RAM and no swap, which is what makes the low
+# memory killer so aggressive.  This daemon turns swap on - a zram
+# compressed-RAM area by default, optionally a real partition on the
+# removable SD card - and keeps it reconciled with three
+# persist.v521.swap.* properties.  See the "Swap" section of
+# device/lge/v521/README.md.
+type v521swap, domain;
+type v521swap_exec, exec_type, file_type;
+init_daemon_domain(v521swap)
+
+# swapon(2) and swapoff(2) both need CAP_SYS_ADMIN.
+allow v521swap self:capability sys_admin;
+
+# The zram block device /dev/block/zram0 is labelled "ram_device" by the
+# platform (system/sepolicy/private/file_contexts: /dev/block/zram[0-9]*).
+# The daemon writes the legacy swap header to it (open/write) and then
+# swaps it on (the kernel reads the header with the caller's creds).
+allow v521swap ram_device:blk_file rw_file_perms;
+
+# The zram control files /sys/block/zram0/{disksize,reset,max_comp_streams}
+# live under /devices/virtual/block/zram0, already labelled "sysfs_zram"
+# (system/sepolicy/public/file.te, .../private/genfs_contexts).
+allow v521swap sysfs_zram:dir search;
+allow v521swap sysfs_zram:file rw_file_perms;
+
+# /proc/swaps, to reconcile against what is already active.  It is covered
+# by the catch-all "genfscon proc / u:object_r:proc:s0".
+allow v521swap proc:file r_file_perms;
+
+# The uuid written into the swap header is read from /dev/urandom.
+allow v521swap urandom_device:chr_file r_file_perms;
+
+# Read the configuration (persist.v521.swap.enabled / backend / size) and
+# publish the result in v521.swap.status.  set_prop() grants both the
+# property_service:set and the read of the property type.
+set_prop(v521swap, v521_swap_prop)
+
+###########################################################################
+# SD-card backend (backend = sdcard | both) - not reachable yet.
+#
+# The daemon reads the partition table from the whole-disk node
+# /dev/block/mmcblk1 and writes the swap header to the type-0x82 partition
+# on it.  Those nodes are not labelled for swap in this policy yet (the
+# whole disk is "sd_device" and the partitions fall through to the generic
+# block_device type, which domain.te forbids a non-init domain to open),
+# so the SD-card path currently ends in an "error:" status instead of a
+# denial.  The default zram backend needs none of this.  Labelling the SD
+# swap partition as swap_block_device and granting rw_file_perms here is
+# the remaining work; see README.md "Swap".
+###########################################################################

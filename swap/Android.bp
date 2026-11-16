@@ -1,0 +1,24 @@
+// v521swap - the on-device swap manager for the LG V521.
+//
+// The tablet has 2 GB of RAM and no swap at all, which makes the low
+// memory killer very aggressive.  This daemon turns swap on (a zram
+// compressed-RAM area by default, optionally a real partition on the
+// removable SD card) and keeps it reconciled with three
+// persist.v521.swap.* system properties.  See v521swap.c and the "Swap"
+// section of ../README.md.
+cc_binary {
+    name: "v521swap",
+
+    srcs: ["v521swap.c"],
+
+    // liblog provides the ALOG* macros; libc (implicit) provides the
+    // __system_property_* and syscall() entry points the daemon uses.
+    shared_libs: [
+        "liblog",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}

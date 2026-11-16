@@ -152,6 +152,12 @@ PRODUCT_PACKAGES += \
 PRODUCT_PACKAGES += \
     GestureHandler
 
+# Swap manager (zram by default, optional SD-card partition).  The daemon
+# reconciles swap from the persist.v521.swap.* properties; see swap/ and
+# the "Swap" section of README.md.
+PRODUCT_PACKAGES += \
+    v521swap
+
 # Side QuickButton (gpio-keys hot_key)
 # The app is developed in its own repository
 # (github.com/MicahOttah/android_app_QuickButton).  Clone it into

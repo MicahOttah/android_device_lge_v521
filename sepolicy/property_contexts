@@ -16,3 +16,9 @@ ro.sf.lcd_density                             u:object_r:sf_lcd_density_prop:s0
 # ctl_default_prop through the plat "ctl." catch-all, which the
 # init scripts are not allowed to write.
 ctl.msm_irqbalance                            u:object_r:msm_irqbalance_prop:s0
+
+# The swap manager's configuration and status (see sepolicy/property.te
+# and swap/v521swap.c).  These are prefix matches: persist.v521.swap.
+# covers enabled/backend/size, v521.swap. covers status.
+persist.v521.swap.                            u:object_r:v521_swap_prop:s0
+v521.swap.                                    u:object_r:v521_swap_prop:s0

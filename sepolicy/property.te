@@ -1,0 +1,23 @@
+# Properties of the v521 swap manager.
+#
+#   persist.v521.swap.enabled   "0" / "1"            (configuration)
+#   persist.v521.swap.backend   "zram"/"sdcard"/"both"
+#   persist.v521.swap.size      zram size in bytes
+#   v521.swap.status            published by the daemon
+#
+# They share one type.  The daemon (domain v521swap) reads the three
+# persist.* values and writes the status; the UI and, during bring-up,
+# the adb shell write the three persist.* values.  Without a dedicated
+# type they would land in the plat catch-all "default_prop", which
+#   neverallow { domain -init } default_prop:property_service set;
+# (system/sepolicy/public/domain.te) forbids every non-init domain to
+# set, so neither the daemon nor the UI could change them.
+type v521_swap_prop, property_type;
+
+# The LineageParts "Swap settings" page (a platform-signed priv-app,
+# domain system_app) writes the persist.v521.swap.* configuration.
+set_prop(system_app, v521_swap_prop)
+
+# Allow the configuration to be driven from "adb shell setprop" during
+# bring-up and testing.
+set_prop(shell, v521_swap_prop)

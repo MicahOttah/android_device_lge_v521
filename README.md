@@ -27,7 +27,7 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | USB diag port | working - only while USB debugging is enabled (`adb`, `mtp,adb`, `ptp,adb`); the modem answers |
 | TWRP recovery | working - built from this tree, protected |
 | Build revision | working - `v521-15.1-buildN` in the build number and in the OTA name |
-| Swap (zRAM / SD card) | in progress |
+| Swap (zRAM / SD card) | wired in, zRAM untested |
 
 ## Repositories
 
@@ -218,8 +218,11 @@ Everything the port needs is on GitHub under `MicahOttah`.
    friends, so the `dlopen()` would find the file and then fail to find
    the entry point.  `libmmcamera_sw_tnr.so` does not exist for any device
    in the tree.
-4. **The swap feature is not finished.**  The daemon is written, but
-   nothing is in a release build yet - see *Swap*.
+4. **The swap feature is not finished.**  The daemon, its build, its init
+   service and its SELinux policy are all in the tree now, so the zRAM
+   backend is in the next build - but it has not been built or tested on
+   the device yet, and the SD-card backend and the Settings UI are still
+   open.  See *Swap*.
 
 ## The build revision
 
@@ -269,8 +272,14 @@ overwritten by a ROM build.  Three things protect it:
 
 ## Swap
 
-*Work in progress.*  The design is finished and the daemon is written, but
-none of it is in a release build yet.
+*Work in progress.*  The daemon, its build file (`swap/Android.bp`), its
+init service (`v521swap` in `rootdir/etc/init.target.rc`) and its SELinux
+policy (`sepolicy/swap.te`, `property.te`, the `file_contexts` and
+`property_contexts` entries) are all in the tree, so the **zRAM backend is
+in the next build**.  Still open: a build and an on-device test, the
+**SD-card backend's device labelling** (the swap partition needs the
+`swap_block_device` label before the enforcing policy will let the daemon
+open it), and the **Settings UI**.
 
 The plan is a user-configurable swap in *Settings -> System -> LineageParts*,
 with three properties as the interface:
@@ -310,10 +319,23 @@ partition is safe.  The repartitioning is done on the host with the card
 unmounted and the content backed up first; the on-device daemon only
 activates a partition that has been prepared.
 
-The SELinux side is a new `v521swap` domain with its own `exec` type, a
-`coredomain` for the property socket, `capability sys_admin` for
-`swapon()`, `swap_block_device:blk_file rw` for the swap block device and
-`sysfs_zram:file rw` for the zRAM control files.
+The SELinux side (`sepolicy/swap.te`) is a new `v521swap` domain created
+with `init_daemon_domain`, holding `capability sys_admin` for `swapon()`,
+`ram_device:blk_file rw` for `/dev/block/zram0` (the platform already
+labels the zRAM nodes `ram_device`), `sysfs_zram:file rw` for the zRAM
+control files, `proc:file r` for `/proc/swaps`, `urandom_device:chr_file
+r` for the header uuid, and `set_prop` on the new `v521_swap_prop` type.
+The SD-card swap partition is not labelled `swap_block_device` yet, so
+only the zRAM backend is reachable from the enforcing policy so far.
+
+To drive it by hand during bring-up (the Settings UI does the same):
+
+    adb shell setprop persist.v521.swap.backend zram
+    adb shell setprop persist.v521.swap.size $((384 * 1024 * 1024))
+    adb shell setprop persist.v521.swap.enabled 1
+    adb shell getprop v521.swap.status      # -> on:zram:402653184
+    adb shell cat /proc/swaps
+    adb shell setprop persist.v521.swap.enabled 0   # turn it back off
 
 ## Bring-up settings
 

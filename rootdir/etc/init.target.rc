@@ -285,3 +285,15 @@ service mdtpd /system/vendor/bin/mdtpd
 on boot
     write /sys/devices/soc.0/78b8000.i2c/i2c-4/4-0020/input/input0/fw_name PR1702898-s3528t_00260005_00380008.img
     write /sys/devices/soc.0/78b8000.i2c/i2c-4/4-0020/input/input0/update_fw 1
+
+# Swap manager.  The daemon reconciles swap (zram by default, optional
+# SD-card partition) from the persist.v521.swap.* properties and keeps
+# reconciling every few seconds, so the user can turn it on and off at
+# runtime.  It runs as root because swapon(2)/swapoff(2) need
+# CAP_SYS_ADMIN and it writes the zram control files and the swap header.
+# late_start keeps it out of the boot critical path; it starts after
+# post-fs-data so the persist.v521.swap.* values are already loaded.
+service v521swap /system/bin/v521swap
+    class late_start
+    user root
+    group root
