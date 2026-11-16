@@ -48,6 +48,7 @@ Everything the port needs is on GitHub under `MicahOttah`.
 | [`android_hardware_ril`](https://github.com/MicahOttah/android_hardware_ril) | `lineage-15.1-caf` | The CAF RIL: SIM_IO, command mapping, signal strength, data registration. |
 | [`android_bootable_recovery`](https://github.com/MicahOttah/android_bootable_recovery) | `lineage-15.1-v521` | The stock LineageOS recovery: no silent wipe, no reboot out of it. |
 | [`android_bootable_recovery-twrp`](https://github.com/MicahOttah/android_bootable_recovery-twrp) | `lineage-15.1-v521` | The TWRP crash handler. Flattened snapshot, see *Known issues*. |
+| [`android_packages_apps_LineageParts`](https://github.com/MicahOttah/android_packages_apps_LineageParts) | `lineage-15.1-v521` | The swap settings page (*Settings -> System -> Swap*). |
 
 ## What works
 
@@ -297,6 +298,7 @@ with system properties as the interface:
 | `persist.v521.swap.reclaim` | `auto` (default: Qualcomm process reclaim on while zRAM is active), `on`, `off` |
 | `persist.v521.swap.swappiness` | 0 - 100; unset leaves the kernel value (`init.target.rc` sets 100) |
 | `v521.swap.status` | published by the daemon: `off`, `error:<reason>`, or `on:` with one item per requested backend, e.g. `on:zram=536870912,sdcard=2147483648` or `on:zram=536870912,sdcard=missing` |
+| `v521.swap.usage` | published by the daemon: `<backend>=<used KiB>/<size KiB>` per active area, e.g. `zram=90168/524284,sdcard=312/2097148`, or `none` (the Settings page cannot read `/proc/swaps` itself) |
 
 The kernel fills the swap area with the **higher priority first** and only
 spills into a lower one when it is full; equal priorities stripe pages
@@ -309,7 +311,7 @@ not an error - zRAM keeps working and the card is picked up when inserted.
 swapped out to it are gone, and the apps they belong to crash when they
 touch them.  Turn swap off (or switch to zRAM only) first.
 
-### Settings page (planned, LineageParts)
+### Settings page (LineageParts, *Settings -> System -> Swap*)
 
 | Control | Writes | Choices |
 | --- | --- | --- |
@@ -319,9 +321,13 @@ touch them.  Turn swap off (or switch to zRAM only) first.
 | zRAM size | `size` | 256 / 384 / 512 / 768 / 1024 MiB |
 | Proactive reclaim | `reclaim` | Automatic (with zRAM) / Always / Never |
 | Swappiness | `swappiness` | Kernel default / 30 / 60 / 100 |
-| Status (read only) | reads `v521.swap.status` and `/proc/swaps` | e.g. "zRAM 512 MB, 12 MB used - SD card 2 GB, 0 MB used" or "SD card: no swap partition" |
+| Status (read only) | reads `v521.swap.status` and `v521.swap.usage` | e.g. "zRAM 512 MB, 12 MB used - SD card 2 GB, 0 MB used" or "SD card: no swap partition" |
 
-The page only reads and writes these properties; it needs no privilege
+The page is `org.lineageos.lineageparts.swap.SwapSettings` in the
+`MicahOttah/android_packages_apps_LineageParts` fork, branch
+`lineage-15.1-v521`; it reaches Settings through an `activity-alias`
+with `com.android.settings.category.ia.system`, so neither Settings nor
+lineage-sdk needed changes.  It only reads and writes these properties; it needs no privilege
 beyond `set_prop` on `v521_swap_prop`, which `sepolicy/property.te`
 already grants to `system_app` - the domain LineageParts runs in
 (platform signed, `android.uid.system`).  The numeric priorities stay
@@ -463,7 +469,7 @@ The commits of the port, per repository.
 
 | Repository | Branch | Commits |
 | --- | --- | --- |
-| `android_device_lge_v521` | `lineage-15.1` | `f2c3bf0` bring up 15.1, `e0bd761` README, `c52c2b6` CAF blobs out of the protobuf stack, `566ee0d` CAF RIL logging off, `164f73b` drop the stock CAF libril.so, `7396d7d` port status, `cccc833` SELinux domains for the vendor daemons, `ec68ed8` SELinux enforcing, `bdbf752` README, `baffb98` recovery: /dev/block/bootdevice, `61880ad` DPM daemon, `de4f2e1` ELF string patcher, `83d6ffd` build revision, `fee61f0` Widevine, `bfabf1c` name the build number buildN, `eac79b4` TWRP build files, `e856f33` QuickButton app, `bf51acb` README, `dd2c567` README, `08b0a8c` README, `6bd0bc5` README, `ed91e28` README, `2146fc9` IR HAL access to the SPI IR driver, `42527cd` diag port in the MTP and PTP modes |
+| `android_device_lge_v521` | `lineage-15.1` | `f2c3bf0` bring up 15.1, `e0bd761` README, `c52c2b6` CAF blobs out of the protobuf stack, `566ee0d` CAF RIL logging off, `164f73b` drop the stock CAF libril.so, `7396d7d` port status, `cccc833` SELinux domains for the vendor daemons, `ec68ed8` SELinux enforcing, `bdbf752` README, `baffb98` recovery: /dev/block/bootdevice, `61880ad` DPM daemon, `de4f2e1` ELF string patcher, `83d6ffd` build revision, `fee61f0` Widevine, `bfabf1c` name the build number buildN, `eac79b4` TWRP build files, `e856f33` QuickButton app, `bf51acb` README, `dd2c567` README, `08b0a8c` README, `6bd0bc5` README, `ed91e28` README, `2146fc9` IR HAL access to the SPI IR driver, `42527cd` diag port in the MTP and PTP modes, `9d194a4` diag port only with USB debugging, `f691e49` swap manager wired into the build, `5dcdcec` swap manager fixes and SD card, `94b45b7` swap priorities, process reclaim, swappiness |
 | `proprietary_vendor_lge` | `lineage-15.1` | `12617af` CAF blobs out of the protobuf stack, `98680e5` drop the stock CAF libril.so, `7dfb70d` vendor modules, `f8f1f62` DPM daemon and libraries, `35b9cc9` OEM crypto library, `ca0b734` README |
 | `android_device_lge_common` | `lineage-15.1-v521` | `7a9c238` skip LG's own consumer IR service, `3f8d7df` README |
 | `android_system_core` | `lineage-15.1-v521` | `5e3b6fb` never overwrite the recovery partition, `373c684` README |
@@ -476,3 +482,4 @@ The commits of the port, per repository.
 | `android_hardware_ril` | `lineage-15.1-caf` | `904ec8a` CAF SIM_IO, command mapping, signal strength, data registration, `38352e9` README |
 | `android_bootable_recovery` | `lineage-15.1-v521` | `08bbbb07e` no silent wipe, no reboot out of the recovery, `897195b5` README |
 | `android_bootable_recovery-twrp` | `lineage-15.1-v521` | `e765bd1` flattened snapshot of `790c815` (crash report) and `a137904` (README) |
+| `android_packages_apps_LineageParts` | `lineage-15.1-v521` | `d485ba2` swap settings page |

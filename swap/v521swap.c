@@ -126,6 +126,7 @@
 #define PROP_RECLAIM    "persist.v521.swap.reclaim"          /* auto|on|off */
 #define PROP_SWAPPINESS "persist.v521.swap.swappiness"       /* 0..100, unset = leave */
 #define PROP_STATUS     "v521.swap.status"
+#define PROP_USAGE      "v521.swap.usage"                     /* see publish_usage() */
 
 #define BACKEND_ZRAM    "zram"
 #define BACKEND_SDCARD  "sdcard"
@@ -697,6 +698,41 @@ static void publish(const char *status) {
     prop_set(PROP_STATUS, status);
 }
 
+/*
+ * v521.swap.usage: "<backend>=<used KiB>/<size KiB>[,...]" for the swap
+ * areas this daemon manages, or "none".  The Settings page shows it; it
+ * cannot read /proc/swaps itself (system_app has no access to /proc).
+ * Written only when it changes, and without logging - it changes often.
+ */
+static void publish_usage(void) {
+    struct swap_entry entries[MAX_SWAP_ENTRIES];
+    char usage[PROP_VALUE_MAX];
+    char current[PROP_VALUE_MAX];
+    size_t n = 0;
+    int count, i;
+
+    usage[0] = '\0';
+    count = read_swap_table(entries, MAX_SWAP_ENTRIES);
+    for (i = 0; i < count && n < sizeof(usage); i++) {
+        const char *name;
+        if (strcmp(entries[i].device, ZRAM_DEV) == 0)
+            name = BACKEND_ZRAM;
+        else if (is_sd_partition(entries[i].device))
+            name = BACKEND_SDCARD;
+        else
+            continue;
+        n += snprintf(usage + n, sizeof(usage) - n, "%s%s=%" PRIu64 "/%" PRIu64,
+                      n ? "," : "", name, entries[i].used_kb, entries[i].size_kb);
+    }
+    if (n == 0)
+        snprintf(usage, sizeof(usage), "none");
+
+    if (prop_get(PROP_USAGE, current, sizeof(current)) == 0 &&
+        strcmp(current, usage) == 0)
+        return;
+    __system_property_set(PROP_USAGE, usage);
+}
+
 static void reconcile(void) {
     struct swap_entry entries[MAX_SWAP_ENTRIES];
     int count;
@@ -904,12 +940,14 @@ int main(int argc, char **argv) {
 
     if (once) {
         reconcile();
+        publish_usage();
         return 0;
     }
 
     ALOGI("v521swap started");
     while (!g_stop) {
         reconcile();
+        publish_usage();
         sleep_seconds(5);
     }
     ALOGI("v521swap stopped");
