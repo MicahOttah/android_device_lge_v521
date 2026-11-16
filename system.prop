@@ -142,3 +142,9 @@ wifi.interface=wlan0
 
 # 15.1: multihal is built as sensors.$(TARGET_DEVICE); point the HAL loader at it
 ro.hardware.sensors=v521
+
+# Keep the recovery partition in step with the ROM: init starts
+# install-recovery.sh (system/core init.rc) when this is true, so the
+# recovery menu shows the installed build.  Settings has no switch for it
+# in 15.1; "setprop persist.sys.recovery_update false" as root turns it off.
+persist.sys.recovery_update=true
