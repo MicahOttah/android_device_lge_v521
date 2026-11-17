@@ -43,6 +43,7 @@ each change is in that repository's `git log`.
 | [`android_packages_apps_LineageParts`](https://github.com/MicahOttah/android_packages_apps_LineageParts) | `lineage-16.0` | The swap settings page. |
 | [`android_frameworks_native`](https://github.com/MicahOttah/android_frameworks_native) | `lineage-16.0` | Gralloc error logging. |
 | [`android_hardware_qcom_display`](https://github.com/MicahOttah/android_hardware_qcom_display) | `lineage-16.0-caf-8952` | Gralloc error logging. |
+| [`android_hardware_qcom_audio`](https://github.com/MicahOttah/android_hardware_qcom_audio) | `lineage-16.0-caf-8952` | The CAF audio HAL of 2016 without `-Werror`. |
 
 ## Builds
 
