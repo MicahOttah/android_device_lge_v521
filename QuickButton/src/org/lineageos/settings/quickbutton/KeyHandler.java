@@ -203,7 +203,9 @@ public class KeyHandler implements DeviceKeyHandler {
         if (locked && !showsOverKeyguard) {
             // Ask for unlock; the app is waiting behind the lock screen
             try {
-                WindowManagerGlobal.getWindowManagerService().dismissKeyguard(null);
+                // Android 9 added the message of the unlock prompt to
+                // dismissKeyguard(IKeyguardDismissCallback, CharSequence).
+                WindowManagerGlobal.getWindowManagerService().dismissKeyguard(null, null);
             } catch (RemoteException e) {
                 // system_server is going down
             }
