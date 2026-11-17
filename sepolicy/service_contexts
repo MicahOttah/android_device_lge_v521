@@ -1,19 +1,27 @@
 # Services registered with the legacy servicemanager.
 #
 # The legacy servicemanager (the one that runs on this device) resolves
-# service names through plat_service_contexts + nonplat_service_contexts.
-# CAF only ships the mapping for the two services below in
-# device/qcom/sepolicy/common/vndservice_contexts, which is the file
-# used by vndservicemanager.  Without the entries here both names fall
+# service names through plat_service_contexts + vendor_service_contexts.
+# CAF only ships the mapping for the services below in
+# device/qcom/sepolicy-legacy/common/vndservice_contexts, which is the
+# file used by vndservicemanager.  Without the entry here the name falls
 # through to the plat catch-all "default_android_service" and the
 # registration is rejected with
 #
-#   avc: denied { add } for service=vendor.qcom.PeripheralManager
-#      scontext=u:r:per_mgr:s0 tcontext=u:object_r:default_android_service:s0
+#   avc: denied { add } for service=com.qualcomm.qti.qseeproxy
+#      scontext=u:r:qseeproxy:s0 tcontext=u:object_r:default_android_service:s0
 #      tclass=service_manager
 #
-# The types themselves are declared by CAF in
-# device/qcom/sepolicy/common/vndservice.te; service.te adds the
-# service_manager_type attribute they need to be usable here.
-vendor.qcom.PeripheralManager                   u:object_r:per_mgr_service:s0
+# The type itself is declared by CAF in
+# device/qcom/sepolicy-legacy/common/vndservice.te; service.te adds the
+# service_manager_type attribute it needs to be usable here.
+#
+# vendor.qcom.PeripheralManager is not in this file: CAF maps it for the
+# legacy servicemanager in
+# device/qcom/sepolicy-legacy/legacy-common/service_contexts (as
+# binder_per_mgr_service).  A second, different mapping of the same name
+# stops the build with
+#
+#   Multiple different specifications for vendor.qcom.PeripheralManager
+#     (u:object_r:per_mgr_service:s0 and u:object_r:binder_per_mgr_service:s0)
 com.qualcomm.qti.qseeproxy                      u:object_r:qseeproxy_service:s0
