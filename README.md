@@ -15,7 +15,7 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | Area | State |
 | --- | --- |
 | Boot, SELinux | working, enforcing |
-| Radio, LTE data | working |
+| Radio, LTE data | working, the network list shows carrier names, MCC+MNC and the radio technology |
 | Camera | working (both sensors, stills, RAW, scene modes) |
 | Sensors, auto-rotation | working (26/26) |
 | Wi-Fi, Bluetooth, audio | working |
