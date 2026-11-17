@@ -23,7 +23,7 @@ PRODUCT_SYSTEM_DEFAULT_PROPERTIES += \
     persist.logd.logpersistd=logcatd \
     persist.logd.size=8388608
 
-# adb auth is disabled via WITH_ADB_INSECURE=true in v521env; vendor/lineage/config/common.mk
-# is patched locally to honour it (15.1 doesn't upstream).
+# adb auth is disabled via WITH_ADB_INSECURE=true in v521env; the 16.0
+# vendor/lineage/config/common.mk honours it upstream.
 
 # lk2nd (DISABLED): built outside the Android tree, see v521env.

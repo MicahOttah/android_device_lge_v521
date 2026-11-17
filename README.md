@@ -1,14 +1,14 @@
 # android_device_lge_v521
 
-Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
-(Android 8.1), based on the upstream `LineageOS/android_device_lge_v521`
-`lineage-15.1` branch.
+Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 16.0**
+(Android 9), based on the upstream `LineageOS/android_device_lge_v521`
+tree.
 
 | | |
 | --- | --- |
 | Device | LG G Pad X 8.0 (V521), model `b3_tmo_us` |
 | SoC | Qualcomm MSM8952 (Snapdragon 625), 32-bit kernel and userspace |
-| Android | 8.1.0, LineageOS 15.1, userdebug |
+| Android | 9.0, LineageOS 16.0, userdebug |
 
 ## Status
 
@@ -20,10 +20,10 @@ Device tree for the **LG G Pad X 8.0 (V521)** on **LineageOS 15.1**
 | Sensors, auto-rotation | working (26/26) |
 | Wi-Fi, Bluetooth, audio | working |
 | Widevine | working, **L1** |
-| DPM (`dpmd`) | working |
 | IR blaster | working |
 | USB diag port | working, only while USB debugging is on |
-| Recovery | working, kept in step with the ROM |
+| Recovery | the original TWRP is kept; the ROM never rewrites the recovery partition |
+| DPM (`dpmd`) | installed but not started, the Pie data path has no driver for it |
 | Swap (zRAM / SD card) | working, *Settings -> System -> Swap* |
 
 ## Repositories
@@ -33,26 +33,24 @@ each change is in that repository's `git log`.
 
 | Repository | Branch | What it changes |
 | --- | --- | --- |
-| [`android_device_lge_v521`](https://github.com/MicahOttah/android_device_lge_v521) (this one) | `lineage-15.1` | The device tree. |
-| [`proprietary_vendor_lge`](https://github.com/MicahOttah/proprietary_vendor_lge) | `lineage-15.1` | Blobs: CAF protobuf rename, OEM crypto, DPM. |
-| [`android_device_lge_common`](https://github.com/MicahOttah/android_device_lge_common) | `lineage-15.1-v521` | Skips LG's UART IR service for the v521. |
-| [`android_kernel_lge_msm8952`](https://github.com/MicahOttah/android_kernel_lge_msm8952) | `lineage-15.1-v521` | 64-bit binder on the 32-bit kernel, IR clock rates. |
-| [`android_hardware_ril`](https://github.com/MicahOttah/android_hardware_ril) | `lineage-15.1-caf` | CAF RIL compatibility. |
-| [`android_frameworks_base`](https://github.com/MicahOttah/android_frameworks_base) | `lineage-15.1-v521` | Compatibility shims for the stock CNE blobs. |
-| [`android_vendor_lineage`](https://github.com/MicahOttah/android_vendor_lineage) | `lineage-15.1-v521` | `WITH_ADB_INSECURE` support. |
-| [`android_bootable_recovery`](https://github.com/MicahOttah/android_bootable_recovery) | `lineage-15.1-v521` | No silent wipe, no reboot out of recovery. |
-| [`android_packages_apps_LineageParts`](https://github.com/MicahOttah/android_packages_apps_LineageParts) | `lineage-15.1-v521` | The swap settings page. |
-| [`android_system_core`](https://github.com/MicahOttah/android_system_core) | `lineage-15.1-v521` | Upstream again (README only). |
-| `android_frameworks_native`, `android_hardware_interfaces`, `android_hardware_qcom_display` | `lineage-15.1-v521` | Gralloc error logging. |
-| [`android_bootable_recovery-twrp`](https://github.com/MicahOttah/android_bootable_recovery-twrp) | `lineage-15.1-v521` | TWRP crash fix (flattened snapshot). |
+| [`android_device_lge_v521`](https://github.com/MicahOttah/android_device_lge_v521) (this one) | `lineage-16.0` | The device tree. |
+| [`proprietary_vendor_lge`](https://github.com/MicahOttah/proprietary_vendor_lge) | `lineage-16.0` | Blobs: CAF protobuf rename, OEM crypto, DPM. |
+| [`android_device_lge_common`](https://github.com/MicahOttah/android_device_lge_common) | `lineage-16.0` | Skips LG's UART IR service for the v521. |
+| [`android_kernel_lge_msm8952`](https://github.com/MicahOttah/android_kernel_lge_msm8952) | `lineage-16.0` | 64-bit binder on the 32-bit kernel, IR clock rates. |
+| [`android_hardware_ril`](https://github.com/MicahOttah/android_hardware_ril) | `lineage-16.0-caf` | CAF RIL compatibility. |
+| [`android_frameworks_base`](https://github.com/MicahOttah/android_frameworks_base) | `lineage-16.0` | Compatibility shims for the stock CNE blobs. |
+| [`android_system_core`](https://github.com/MicahOttah/android_system_core) | `lineage-16.0` | The recovery partition is never overwritten. |
+| [`android_packages_apps_LineageParts`](https://github.com/MicahOttah/android_packages_apps_LineageParts) | `lineage-16.0` | The swap settings page. |
+| [`android_frameworks_native`](https://github.com/MicahOttah/android_frameworks_native) | `lineage-16.0` | Gralloc error logging. |
+| [`android_hardware_qcom_display`](https://github.com/MicahOttah/android_hardware_qcom_display) | `lineage-16.0-caf-8952` | Gralloc error logging. |
 
 ## Builds
 
 Every build gets a number, `buildN`, which shows up in:
 
-* *Settings -> About phone -> Build number* (`v521-15.1-buildN`),
+* *Settings -> About phone -> Build number* (`v521-16.0-buildN`),
 * `ro.lineage.version` and the zip name
-  (`lineage-15.1-<date>-UNOFFICIAL-buildN-v521.zip`),
+  (`lineage-16.0-<date>-UNOFFICIAL-buildN-v521.zip`),
 * the bottom line of the recovery menu.
 
 `build-revision.mk` adds `ro.v521.build.{revision,attempt,commit}` when the
@@ -60,11 +58,10 @@ build script passes them in; a plain `mka` builds without a revision.
 
 ## Installing
 
-The recovery partition holds the LineageOS recovery from this tree.
-`system.prop` sets `persist.sys.recovery_update=true`, so on each boot
-`install-recovery.sh` rewrites the recovery to match the installed ROM.
-(15.1 Settings has no switch for it; `setprop
-persist.sys.recovery_update false` as root turns it off.)
+The recovery partition holds the original TWRP, and the ROM must never
+rewrite it: `system.prop` sets `persist.sys.recovery_update=false`, the
+`flash_recovery` service in `init.rc` has no trigger and the ROM image
+carries no `install-recovery.sh`.
 
 To install a build:
 
@@ -115,6 +112,6 @@ zRAM first.
 
 ## Bring-up settings
 
-`bringup.mk` is temporary: USB debugging is on and unauthenticated from the
-first boot (`mtp,adb`, `WITH_ADB_INSECURE=true`), and logcat is kept in
+`bringup.mk` is temporary: USB debugging is on from the first boot
+(`mtp,adb`), adb authentication is disabled, and logcat is kept in
 `/data/misc/logd`.
