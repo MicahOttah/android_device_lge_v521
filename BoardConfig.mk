@@ -198,6 +198,26 @@ TARGET_SYSTEM_PROP := $(DEVICE_PATH)/system.prop
 BOARD_USES_QCOM_HARDWARE := true
 BOARD_USES_QC_TIME_SERVICES := true
 
+# The IPA config manager comes from the device tree, not from the CAF tree
+# of the LineageOS manifest.
+#
+# LineageOS 16.0 has the CAF data-ipa-cfg-mgr in
+# vendor/qcom/opensource/data-ipa-cfg-mgr (LA.UM.7.3.r1-06900-sdm845.0),
+# and the device tree has its own copy of it in data-ipa-cfg-mgr - the one
+# the 15.1 build used and the one that works on this device.  Both define
+# the module "ipacm", and the build stops with
+#
+#     error: vendor/qcom/opensource/data-ipa-cfg-mgr/ipacm/src:
+#            MODULE.TARGET.EXECUTABLES.ipacm already defined by
+#            device/lge/v521/data-ipa-cfg-mgr/ipacm/src
+#
+# The build system picks the tree through the path map of the project
+# qcom-data-ipa-cfg-mgr (vendor/lineage/build/core/qcom_target.mk):
+# USE_DEVICE_SPECIFIC_DATA_IPA_CFG_MGR makes it use the copy of the device
+# tree, and the CAF tree is then skipped, because its Android.mk only
+# builds when the path map points at it.
+USE_DEVICE_SPECIFIC_DATA_IPA_CFG_MGR := true
+
 # Recovery
 # 15.1: boot fstab.qcom omits /system (first-stage mount owns it); recovery/OTA need it
 TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery.fstab

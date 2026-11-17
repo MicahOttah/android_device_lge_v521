@@ -6,6 +6,9 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
 
+# The app registers a KeyHandler, which is a hidden API of the framework.
+LOCAL_PRIVATE_PLATFORM_APIS := true
+
 LOCAL_PACKAGE_NAME := QuickButton
 LOCAL_CERTIFICATE := platform
 LOCAL_PRIVILEGED_MODULE := true
