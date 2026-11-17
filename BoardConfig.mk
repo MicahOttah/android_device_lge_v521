@@ -21,6 +21,45 @@ TARGET_OTA_ASSERT_DEVICE := v521,b3
 
 DEVICE_PATH := device/lge/v521
 
+# Treble
+#
+# This device is NOT Treble.  It has no vendor partition, it is 32-bit only,
+# and its vendor blobs are 2016 CAF binaries that are not namespace clean.
+#
+# Pie decides this from PRODUCT_SHIPPING_API_LEVEL, which must therefore stay
+# UNSET.  Leaving it unset gives, in build/make/core/config.mk:
+#
+#   PRODUCT_FULL_TREBLE            := false   (config.mk:783-790)
+#   PRODUCT_SEPOLICY_SPLIT         := false   (config.mk:795-812)
+#   PRODUCT_ENFORCE_VINTF_MANIFEST := false   (config.mk:795-812)
+#   PRODUCT_USE_VNDK               := false   (config.mk:834-841)
+#   PRODUCT_COMPATIBLE_PROPERTY    := false   (config.mk:769-777)
+#
+# Consequences:
+#
+#   * no platform/vendor policy split -> device/qcom/sepolicy-legacy is the
+#     policy tree (see the SELinux section below);
+#   * no VNDK -> prebuilts/vndk/v27 is not built and the HIDL interfaces
+#     come from source (so android.system.net.netd@1.0 needs no package);
+#   * no ENFORCE_VINTF_MANIFEST -> the HIDL transport falls back to the
+#     passthrough loader, which is what the "passthrough" entries in
+#     manifest.xml need;
+#   * BOARD_BUILD_SYSTEM_ROOT_IMAGE is not demanded.  Setting
+#     PRODUCT_SHIPPING_API_LEVEL >= 28 would make the build fail unless
+#     BOARD_BUILD_SYSTEM_ROOT_IMAGE were also true (config.mk:880), i.e. it
+#     would force a system-as-root layout.
+#
+# Do not set PRODUCT_SHIPPING_API_LEVEL, PRODUCT_FULL_TREBLE_OVERRIDE,
+# PRODUCT_SEPOLICY_SPLIT or PRODUCT_ENFORCE_VINTF_MANIFEST anywhere.
+#
+# The vendor blobs go to /system/vendor (TARGET_COPY_OUT_VENDOR defaults to
+# system/vendor, build/make/core/envsetup.mk:292) and init.rc links
+# /vendor -> /system/vendor, so the /vendor paths in the HIDL service rc
+# files and in hardware/libhardware/hardware.c still resolve.
+#
+# A/B (seamless updates) is likewise off: the device keeps a separate
+# recovery partition, which holds TWRP during the bring-up.
+
 #FORCE_64_BIT := true
 
 # Platform
@@ -178,10 +217,19 @@ endif
 
 # RIL
 TARGET_RIL_VARIANT := caf
-BOARD_RIL_CLASS := ../../../$(DEVICE_PATH)/ril/
+# 15.1 had "BOARD_RIL_CLASS := ../../../$(DEVICE_PATH)/ril/" here, which pointed
+# the build at ril/V521RIL.java.  Pie has no such mechanism any more:
+# BOARD_RIL_CLASS is not read by build/make, ro.telephony.ril_class has no
+# consumer in the Pie framework, and ril/V521RIL.java was never compiled even
+# in 15.1 (there is no ril/Android.mk, and the class is absent from every jar
+# in out/target/product/v521/system/framework).  The file is kept as a record
+# of the intended CAF request translation, but it is inert.
 
 # SELinux
-include device/qcom/sepolicy/sepolicy.mk
+# device/qcom/sepolicy is the Treble/vendor policy; this device has no vendor
+# partition and ships the vendor blobs inside system/vendor, so it needs the
+# legacy policy, which is the one with the upstream Pie rules for msm8952.
+include device/qcom/sepolicy-legacy/sepolicy.mk
 BOARD_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy
 
 # Sensors

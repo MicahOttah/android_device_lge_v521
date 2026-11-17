@@ -85,7 +85,7 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml \
     frameworks/native/data/etc/tablet_core_hardware.xml:system/etc/permissions/tablet_core_hardware.xml
 
-# HIDL HALs (LineageOS 15.1)
+# HIDL HALs (LineageOS 16.0)
 $(call inherit-product, $(LOCAL_PATH)/hidl.mk)
 
 # Audio

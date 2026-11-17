@@ -6,9 +6,9 @@
 # which apps to suspend.  See notes/2026-11-16-dpm-nsrm.md.
 #
 # The upstream CAF policy that this tree builds against
-# (device/qcom/sepolicy/private/dpmd.te) is written for the common case
-# and grants dpmd much less than the daemon actually touches.  With only
-# those rules dpmd dies one second into the boot:
+# (device/qcom/sepolicy-legacy/private/dpmd.te) is written for the common
+# case and grants dpmd much less than the daemon actually touches.  With
+# only those rules dpmd dies one second into the boot:
 #
 #   avc: denied { read } for comm="dpmd" name="name" dev="sysfs"
 #       scontext=u:r:dpmd:s0 tcontext=u:object_r:sysfs:s0 tclass=file
@@ -37,10 +37,19 @@
 #   allow dpmd self:capability {
 #       chown dac_override fsetid net_admin net_raw setgid setuid sys_module
 #   };
-# CAF only grants { net_admin net_raw setuid sys_module }
-# (device/qcom/sepolicy/private/dpmd.te:46-50).  dac_override is what the
-# daemon needs to open the /proc/<pid> entries of apps that are not its
-# own; chown/fsetid/setgid come with the same code path.
+# CAF only grants { setuid net_raw net_admin }
+# (device/qcom/sepolicy-legacy/private/dpmd.te:46-50), and the "common"
+# policy has the whole block commented out
+# (device/qcom/sepolicy-legacy/common/dpmd.te:27-35).  dac_override is
+# what the daemon needs to open the /proc/<pid> entries of apps that are
+# not its own; chown/fsetid/setgid come with the same code path.
+#
+# Note that dac_override is on Pie's "neverallow ~dac_override_allowed"
+# list (system/sepolicy/public/domain.te:1385).  The legacy CAF policy
+# violates that neverallow in a dozen places anyway (diag, qmuxd,
+# sensors, thermal-engine, rfs_access, ...), so the whole tree is built
+# with SELINUX_IGNORE_NEVERALLOWS := true, which is only set for the
+# userdebug and eng variants (device/qcom/sepolicy-legacy/sepolicy.mk:7-12).
 allow dpmd self:capability { chown dac_override fsetid setgid };
 
 # --- sysfs ---------------------------------------------------------------
@@ -65,7 +74,7 @@ allow dpmd dpm_conf_file:file { getattr ioctl lock open read };
 #
 # The OEM labels the wrapper socket dpmwrapper_socket, but that type is
 # declared in the CAF *platform private* policy
-# (device/qcom/sepolicy/private/file.te:33), which the device policy
+# (device/qcom/sepolicy-legacy/private/file.te:33), which the device policy
 # cannot see: checkpolicy compiles the device (nonplat) policy on its
 # own, so a type that only exists in the platform policy is "unknown"
 # there.
@@ -149,7 +158,7 @@ allow dpmd dnsmasq:dir search;
 #   0xc304  IPC_ROUTER_IOCTL_BIND_CONTROL_PORT
 #
 # (kernel/lge/msm8952/include/uapi/linux/msm_ipc.h; the names are taken
-# from device/qcom/sepolicy/common/ioctl_defines.)
+# from device/qcom/sepolicy-legacy/common/ioctl_defines.)
 #
 # AOSP has
 #

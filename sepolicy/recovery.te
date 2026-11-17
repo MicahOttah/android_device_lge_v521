@@ -21,8 +21,8 @@
 #         tclass=dir
 
 recovery_only(`
-  # Let the recovery write to /dev/kmsg.  The recovery's log messages end up
-  # there and are then visible in /sys/fs/pstore/console-ramoops-0 after the
+  # Let the recovery write to /dev/kmsg.  The log messages of the recovery end
+  # up there and are then visible in /sys/fs/pstore/console-ramoops-0 after the
   # next boot, which is the only way to debug a recovery that reboots or
   # hangs.  Without this rule the recovery log is completely invisible.
   #
@@ -48,7 +48,7 @@ recovery_only(`
 
   # The recovery looks for /data/misc/time/... (the time_daemon data
   # directory) while it sets the system time.  The type is declared in
-  # device/qcom/sepolicy/common/time_daemon.te.
+  # device/qcom/sepolicy-legacy/common/time_daemon.te.
   allow recovery time_data_file:dir search;
   # ... and it reads /data/time/ats_1 to restore the clock.
   allow recovery time_data_file:file r_file_perms;
@@ -69,7 +69,7 @@ recovery_only(`
   #         scontext=u:r:recovery:s0
   #         tcontext=u:object_r:shell_data_file:s0 tclass=dir
   #
-  #   E:Unable to open '"'"'/data/local/tmp/testpkg-signed.zip'"'"':
+  #   E:Unable to open /data/local/tmp/testpkg-signed.zip:
   #     Permission denied
   #
   # Only read access is granted.  The upstream neverallows still forbid the

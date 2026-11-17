@@ -27,7 +27,9 @@
 #
 #
 
-import init.carrier.rc
+# 16.0: "import init.carrier.rc" was removed.  Pie has no init.carrier.rc
+# any more (system/core/rootdir/ carries no carrier configuration), so the
+# import would make init fail to start with "couldn't import init.carrier.rc".
 
 on early-init
     # 8.1+ init no longer creates /dev/block/bootdevice; fstab.qcom depends on it

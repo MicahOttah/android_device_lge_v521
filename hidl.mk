@@ -1,9 +1,25 @@
 #
-# HIDL HALs for LineageOS 15.1 (Android 8.1).
-# First pass: wrap the existing legacy HAL modules (gralloc.msm8952,
-# hwcomposer.msm8952, audio.primary.msm8952, ...) with the AOSP passthrough
-# -impl libraries, and run them as -service processes where the manifest says
-# hwbinder. Modelled on LineageOS/android_device_htc_hiae commit c6809fb.
+# HIDL HALs for LineageOS 16.0 (Android 9 Pie).
+#
+# The set is the one that worked in 15.1 (see git history), with three
+# changes that Pie forces:
+#
+#   * configstore is 1.1 in Pie, not 1.0.
+#   * the camera provider is the LineageOS "legacy" adapter, because the
+#     camera blob is a 2016 CAF camera1 module.  The AOSP provider@2.4
+#     adapter drives the module through the camera3 metadata API, which
+#     that blob does not implement; the legacy adapter bridges camera1 to
+#     HIDL.  Same choice as LineageOS' own CAF trees (lge g2/g3, gpad8.3).
+#   * the GNSS adapter is the LineageOS "legacy" one, because the CAF GPS
+#     blob reports a bigger svinfo struct (HaxxSvStatus) that includes a
+#     GLONASS usage mask; the AOSP adapter only fills the GPS mask.
+#
+# Passthrough HALs are loaded into the client process by the HIDL passthrough
+# loader (system/libhidl/transport/ServiceManagement.cpp), so they only need
+# the -impl library.  HALs declared as hwbinder in manifest.xml need their
+# -service binary as well, otherwise nothing ever registers with
+# hwservicemanager.
+#
 # Must stay in sync with manifest.xml.
 #
 
@@ -18,13 +34,14 @@ PRODUCT_PACKAGES += \
     android.hardware.bluetooth@1.0-service \
     libbt-vendor
 
-# Camera (passthrough, wraps camera.msm8952 blob)
+# Camera (passthrough, wraps the camera.msm8952 blob)
 PRODUCT_PACKAGES += \
-    android.hardware.camera.provider@2.4-impl
+    android.hardware.camera.provider@2.4-impl-legacy \
+    camera.device@1.0-impl-legacy
 
 # ConfigStore
 PRODUCT_PACKAGES += \
-    android.hardware.configstore@1.0-service
+    android.hardware.configstore@1.1-service
 
 # Display
 PRODUCT_PACKAGES += \
@@ -41,26 +58,34 @@ PRODUCT_PACKAGES += \
     android.hardware.drm@1.0-impl \
     android.hardware.drm@1.0-service
 
-# Gatekeeper (wraps gatekeeper.msm8952 blob)
+# Gatekeeper (wraps the gatekeeper.msm8952 blob)
 PRODUCT_PACKAGES += \
     android.hardware.gatekeeper@1.0-impl \
     android.hardware.gatekeeper@1.0-service
 
-# GNSS (passthrough, wraps gps.default blob)
+# GNSS (passthrough, wraps the gps.default blob)
+#
+# The ".legacy" adapter is the LineageOS one (hardware/lineage/interfaces/
+# gnss/1.0-legacy): it differs from the AOSP Pie adapter only in the
+# satellite-status handling, where the CAF blob needs the GLONASS mask.
 PRODUCT_PACKAGES += \
-    android.hardware.gnss@1.0-impl
+    android.hardware.gnss@1.0-impl.legacy
 
 # Health
 PRODUCT_PACKAGES += \
     android.hardware.health@1.0-impl \
     android.hardware.health@1.0-service
 
-# IR (wraps consumerir.msm8952 blob)
+# IR (wraps the consumerir.msm8952 blob)
+#
+# The blob stays at system/lib/hw/consumerir.msm8952.so: Pie's
+# hardware/libhardware/hardware.c still searches /system/lib/hw for legacy
+# modules, and the HAL runs in the 32-bit android.hardware.ir@1.0-service.
 PRODUCT_PACKAGES += \
     android.hardware.ir@1.0-impl \
     android.hardware.ir@1.0-service
 
-# Keymaster (wraps keystore.msm8952 blob)
+# Keymaster (wraps the keystore.msm8952 blob)
 PRODUCT_PACKAGES += \
     android.hardware.keymaster@3.0-impl \
     android.hardware.keymaster@3.0-service
@@ -79,10 +104,18 @@ PRODUCT_PACKAGES += \
 PRODUCT_PACKAGES += \
     android.hardware.renderscript@1.0-impl
 
-# Sensors (wraps sensors.msm8952)
+# Sensors (wraps the sensors.v521 multi-hal)
 PRODUCT_PACKAGES += \
     android.hardware.sensors@1.0-impl \
     android.hardware.sensors@1.0-service
+
+# Soundtrigger (passthrough, loaded by the audio server)
+#
+# Pie has no android.hardware.soundtrigger@2.0-service binary any more, only
+# the adapter library; the sound trigger service in frameworks/av loads it
+# through the passthrough loader.
+PRODUCT_PACKAGES += \
+    android.hardware.soundtrigger@2.0-impl
 
 # USB
 PRODUCT_PACKAGES += \
@@ -98,3 +131,7 @@ PRODUCT_PACKAGES += \
 PRODUCT_PACKAGES += \
     android.hardware.wifi@1.0-service \
     wificond
+
+# Trust (LineageOS USB restriction, used by KeyguardStateMonitor)
+PRODUCT_PACKAGES += \
+    vendor.lineage.trust@1.0-service

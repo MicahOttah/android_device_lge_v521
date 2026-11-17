@@ -27,23 +27,35 @@
 
 # IPA
 #
-# The CAF ipacm daemon writes its pid file into /data/misc/ipa.  CAF
-# keeps the same directory in /data/vendor/ipa and labels it
-# ipa_vendor_data_file (device/qcom/sepolicy/common/file_contexts:530),
-# which is what the ipacm rules in
-# device/qcom/sepolicy/common/ipacm.te:33-34 are written against.
+# The CAF ipacm daemon writes its pid file into /data/misc/ipa.  That
+# directory is NOT labelled here any more: the Pie legacy CAF policy
+# already labels it, and labels it differently:
+#
+#   device/qcom/sepolicy-legacy/legacy-common/file_contexts:20
+#       /data/misc/ipa(/.*)?   u:object_r:ipacm_data_file:s0
+#
+# and the ipacm rules in
+# device/qcom/sepolicy-legacy/legacy-common/ipacm.te:4-5 are written
+# against exactly that type:
+#
+#   allow ipacm ipacm_data_file:dir w_dir_perms;
+#   allow ipacm ipacm_data_file:file create_file_perms;
+#
+# A second entry of our own for the same path would either duplicate
+# the regex (which one wins then depends on the order the contexts files
+# are concatenated in) or, with a different type, leave the daemon
+# without any access at all.
+#
+# init creates the directory ("mkdir /data/misc/ipa 0700 net_admin
+# net_admin" in rootdir/etc/init.qcom.rc).  init's make_dir() looks the
+# context up in file_contexts and calls setfscreatecon() before the
+# mkdir(), so the label from the legacy entry is applied to the new
+# directory and the pid file inside it inherits it.
 #
 # The directory must not keep the generic system_data_file label, because
 # vendor domains may not write to system_data_file:
 #   neverallow { domain -system_server -system_app -init -installd
 #                -update_engine } system_data_file:file no_w_file_perms;
-#
-# init creates the directory ("mkdir /data/misc/ipa 0700 net_admin
-# net_admin" in rootdir/etc/init.qcom.rc).  init's make_dir() looks the
-# context up in file_contexts and calls setfscreatecon() before the
-# mkdir(), so the label from this entry is applied to the new directory
-# and the pid file inside it inherits it.
-/data/misc/ipa(/.*)?                                                u:object_r:ipa_vendor_data_file:s0
 
 # DPM
 #
@@ -79,7 +91,6 @@
 /system/bin/irsc_util                      u:object_r:irsc_util_exec:s0
 /system/bin/mm-qcamera-daemon              u:object_r:mm-qcamerad_exec:s0
 /system/bin/msm_irqbalance                 u:object_r:msm_irqbalanced_exec:s0
-/system/bin/netmgrd                        u:object_r:netmgrd_exec:s0
 /system/bin/pm-proxy                       u:object_r:per_mgr_exec:s0
 /system/bin/pm-service                     u:object_r:per_mgr_exec:s0
 /system/bin/qmuxd                          u:object_r:qmuxd_exec:s0

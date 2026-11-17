@@ -1,16 +1,26 @@
 type sysfs_gesture, fs_type, sysfs_type;
 
-# The remoteproc shared memory debugfs entry that rmt_storage writes to.
+# The remoteproc shared memory debugfs entry that rmt_storage writes to
+# (debugfs_rmt) is NOT declared here: the Pie legacy CAF policy already
+# declares it, together with the genfscon and the rules for the daemon:
+#
+#   device/qcom/sepolicy-legacy/legacy-common/file.te:1
+#       type debugfs_rmt, debugfs_type, fs_type;
+#   device/qcom/sepolicy-legacy/legacy-common/genfs_contexts:1
+#       genfscon debugfs /rmt_storage u:object_r:debugfs_rmt:s0
+#   device/qcom/sepolicy-legacy/legacy-common/rmt_storage.te:5-6
+#       allow rmt_storage debugfs_rmt:dir search;
+#       allow rmt_storage debugfs_rmt:file rw_file_perms;
+#
+# Declaring the type a second time would be a fatal "duplicate type"
+# error in checkpolicy, and a second genfscon for the same filesystem and
+# path is equally fatal.  sepolicy/daemons.te keeps a (narrower) copy of
+# the rmt_storage rules for the record; duplicate allow rules are fine.
 #
 # AOSP forbids generic debugfs access:
 #   neverallow { domain -init -system_server -dumpstate } debugfs:file no_rw_file_perms;
-# (system/sepolicy/public/domain.te), so the entry needs a label of its
-# own.  CAF does the same thing in
-# device/qcom/sepolicy/legacy-common/file.te, but that tree is not part
-# of this build, so the type is declared here.
-#
-# See sepolicy/genfs_contexts for the genfscon that applies it.
-type debugfs_rmt, debugfs_type, fs_type;
+# (system/sepolicy/public/domain.te), which is why the entry needs a
+# label of its own.
 
 # The Qualcomm DPM configuration files below /system/etc/dpm.
 #

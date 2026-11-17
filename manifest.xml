@@ -1,13 +1,38 @@
 <!--
-    HIDL vendor manifest for the LG G Pad X 8.0 (V521), LineageOS 15.1.
-    First pass: every HAL wraps the existing legacy module (passthrough -impl),
-    following the HTC One A9 (hiae) bring-up. No fingerprint, no NFC, no thermal
-    HAL module on this device; adds consumer IR.
+    HIDL vendor manifest for the LG G Pad X 8.0 (V521), LineageOS 16.0
+    (Android 9 Pie).
+
+    Format: the Pie VINTF parser still accepts the <interface>/<name> +
+    <instance> form that 15.1 used, so the structure is unchanged; the
+    differences are in the HAL versions and the transports.
+
+    Transports:
+      * "hwbinder"  - a real service binary registers with hwservicemanager
+                      (see hidl.mk, every -service package has to be listed
+                      there as well).
+      * "passthrough" with arch="32" - the client process loads the adapter
+                      library itself through the HIDL passthrough loader
+                      (system/libhidl/transport/ServiceManagement.cpp).  Only
+                      the -impl library is needed; there is no service
+                      process.
+
+    The device is 32-bit only (TARGET_ARCH := arm), so a passthrough HAL is
+    declared for "32" only: the client that loads the adapter is a 32-bit
+    process.
+
+    Changes against 15.1:
+      * android.hardware.configstore is 1.1 in Pie, not 1.0.
+      * android.hardware.soundtrigger was added: Pie's sound trigger service
+        loads the adapter through the passthrough loader.
+      * vendor.lineage.trust was added (LineageOS USB restriction).
+
+    No fingerprint, no NFC, no thermal HAL module on this device; adds
+    consumer IR.
 -->
 <manifest version="1.0" type="device">
     <hal format="hidl">
         <name>android.hardware.audio</name>
-        <transport arch="32+64">passthrough</transport>
+        <transport arch="32">passthrough</transport>
         <version>2.0</version>
         <interface>
             <name>IDevicesFactory</name>
@@ -16,7 +41,7 @@
     </hal>
     <hal format="hidl">
         <name>android.hardware.audio.effect</name>
-        <transport arch="32+64">passthrough</transport>
+        <transport arch="32">passthrough</transport>
         <version>2.0</version>
         <interface>
             <name>IEffectsFactory</name>
@@ -34,7 +59,7 @@
     </hal>
     <hal format="hidl">
         <name>android.hardware.camera.provider</name>
-        <transport arch="32+64">passthrough</transport>
+        <transport arch="32">passthrough</transport>
         <version>2.4</version>
         <interface>
             <name>ICameraProvider</name>
@@ -44,7 +69,7 @@
     <hal format="hidl">
         <name>android.hardware.configstore</name>
         <transport>hwbinder</transport>
-        <version>1.0</version>
+        <version>1.1</version>
         <interface>
             <name>ISurfaceFlingerConfigs</name>
             <instance>default</instance>
@@ -74,7 +99,7 @@
     </hal>
     <hal format="hidl">
         <name>android.hardware.gnss</name>
-        <transport arch="32+64">passthrough</transport>
+        <transport arch="32">passthrough</transport>
         <version>1.0</version>
         <interface>
             <name>IGnss</name>
@@ -101,7 +126,7 @@
     </hal>
     <hal format="hidl">
         <name>android.hardware.graphics.mapper</name>
-        <transport arch="32+64">passthrough</transport>
+        <transport arch="32">passthrough</transport>
         <version>2.0</version>
         <interface>
             <name>IMapper</name>
@@ -186,7 +211,7 @@
     </hal>
     <hal format="hidl">
         <name>android.hardware.renderscript</name>
-        <transport arch="32+64">passthrough</transport>
+        <transport arch="32">passthrough</transport>
         <version>1.0</version>
         <interface>
             <name>IDevice</name>
@@ -199,6 +224,15 @@
         <version>1.0</version>
         <interface>
             <name>ISensors</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.soundtrigger</name>
+        <transport arch="32">passthrough</transport>
+        <version>2.0</version>
+        <interface>
+            <name>ISoundTriggerHw</name>
             <instance>default</instance>
         </interface>
     </hal>
@@ -235,6 +269,15 @@
         <version>1.0</version>
         <interface>
             <name>ISupplicant</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>vendor.lineage.trust</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IUsbRestrict</name>
             <instance>default</instance>
         </interface>
     </hal>

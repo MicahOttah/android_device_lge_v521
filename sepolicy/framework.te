@@ -30,10 +30,13 @@ allow audioserver sysfs:dir r_dir_perms;
 # label (see /proc/mounts: "context=u:object_r:firmware_file:s0"), and
 # the graphics composer walks it while it loads the display firmware.
 #
-# CAF keeps this rule in its legacy policy, which is not part of this
-# build:
-#   device/qcom/sepolicy/legacy-common/hal_graphics_composer_default.te:1
+# The Pie legacy CAF policy keeps this rule in its legacy policy, which
+# IS part of this build:
+#   device/qcom/sepolicy-legacy/legacy-common/hal_graphics_composer_default.te:1
 #     allow hal_graphics_composer_default firmware_file:dir search;
+#
+# The rule is kept here for the record; duplicate allow rules are merged
+# by checkpolicy and are not an error.
 allow hal_graphics_composer_default firmware_file:dir search;
 
 # --- connectivity --------------------------------------------------------

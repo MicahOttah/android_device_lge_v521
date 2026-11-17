@@ -1,19 +1,21 @@
 # genfs labels.
 #
+# The debugfs label for the remoteproc shared memory entry
+# (genfscon debugfs /rmt_storage -> debugfs_rmt) is NOT repeated here:
+# the Pie legacy CAF policy already ships it, and a second genfscon for
+# the same filesystem and path is a fatal duplicate in checkpolicy:
+#
+#   device/qcom/sepolicy-legacy/legacy-common/genfs_contexts:1
+#       genfscon debugfs /rmt_storage u:object_r:debugfs_rmt:s0
+#
+# For the record, the reason the entry needs a label of its own is that
 # debugfs is a "genfs" superblock as far as SELinux is concerned: the
-# kernel derives the label of every debugfs inode from a genfscon
-# lookup (security_genfs_sid) and not from a path based file_contexts
-# match, so a file_contexts entry for /sys/kernel/debug/... would never
-# take effect here.
-#
-# The path used for the lookup is relative to the filesystem root, so
-# /sys/kernel/debug/rmt_storage/rmts is matched as /rmt_storage/rmts.
-# The entries of one filesystem are kept sorted by descending path
-# length, so /rmt_storage wins over the catch all "genfscon debugfs /".
-#
-# This is the same label CAF uses for this entry, see
-# device/qcom/sepolicy/legacy-common/genfs_contexts.
-genfscon debugfs /rmt_storage u:object_r:debugfs_rmt:s0
+# kernel derives the label of every debugfs inode from a genfscon lookup
+# (security_genfs_sid) and not from a path based file_contexts match, so
+# a file_contexts entry for /sys/kernel/debug/... would never take
+# effect here.  The path used for the lookup is relative to the
+# filesystem root, so /sys/kernel/debug/rmt_storage/rmts is matched as
+# /rmt_storage/rmts.
 
 # The consumer infrared transmitter of the LGE SPI IR driver.
 #

@@ -12,7 +12,7 @@ PRODUCT_BUILD_PROP_OVERRIDES += \
     PRODUCT_DEVICE="b3" \
     PRODUCT_NAME="b3_tmo_us"
 
-# 15.1: a static stock BUILD_FINGERPRINT only changes ro.build.fingerprint, not
+# 16.0: a static stock BUILD_FINGERPRINT only changes ro.build.fingerprint, not
 # ro.vendor.build.fingerprint -> Build.isBuildConsistent() fails -> "There's an
 # internal problem with your device" at boot. Re-add via a vendor init
 # (property_override_dual, like hiae) if certification ever matters.

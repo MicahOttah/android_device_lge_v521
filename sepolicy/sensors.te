@@ -5,11 +5,14 @@
 # sepolicy/file_contexts), which is also the label CAF uses for the
 # sensor directories below /data.
 #
-# The rules are the ones CAF keeps in its legacy policy, which is not
-# part of this build:
-#   device/qcom/sepolicy/legacy-common/sensors.te:5-6
+# The rules are the ones the Pie legacy CAF policy keeps in its legacy
+# policy, which IS part of this build:
+#   device/qcom/sepolicy-legacy/legacy-common/sensors.te:5-6
 #     allow sensors sensors_data_file:dir create_dir_perms;
 #     allow sensors sensors_data_file:file create_file_perms;
+#
+# They are kept here for the record; duplicate allow rules are merged by
+# checkpolicy and are not an error.
 #
 # "search" (part of r_dir_perms) is what the daemon needs to resolve
 # the /sns/cal/sns.reg path at all - without it realpath() fails and the

@@ -1,24 +1,41 @@
-# Properties that the init scripts (qti_init_shell domain) write.
+# Properties that this device tree defines.
 #
-# Both of them land in the plat catch-all "default_prop" without these
-# entries, and
-#
-#   neverallow { domain -init } default_prop:property_service set;
-# (system/sepolicy/public/domain.te) forbids every domain except init
-# from setting default_prop.  CAF already grants qti_init_shell the
-# matching set_prop() rules, the property_contexts entry is what makes
-# them apply to the right property.
-#
-# ro.sf.lcd_density is set by init.qcom.early_boot.sh for msm8952.
-ro.sf.lcd_density                             u:object_r:sf_lcd_density_prop:s0
-
-# ctl.msm_irqbalance is started by init.qcom.sh.  It maps to
-# ctl_default_prop through the plat "ctl." catch-all, which the
-# init scripts are not allowed to write.
-ctl.msm_irqbalance                            u:object_r:msm_irqbalance_prop:s0
-
 # The swap manager's configuration and status (see sepolicy/property.te
 # and swap/v521swap.c).  These are prefix matches: persist.v521.swap.
 # covers enabled/backend/size, v521.swap. covers status.
+#
+# They need their own type: without it they would land in the plat
+# catch-all "default_prop", which
+#
+#   neverallow { domain -init } default_prop:property_service set;
+# (system/sepolicy/public/domain.te) forbids every domain except init
+# from setting.
 persist.v521.swap.                            u:object_r:v521_swap_prop:s0
 v521.swap.                                    u:object_r:v521_swap_prop:s0
+
+# The two entries that were here in 15.1 are gone:
+#
+#   ro.sf.lcd_density
+#       AOSP's public/property_contexts now carries
+#           ro.sf.lcd_density u:object_r:exported3_default_prop:s0 exact int
+#       and an "exact" match beats a prefix match in the property
+#       context trie (system/core/property_service/libpropertyinfoparser/
+#       property_info_parser.cpp, GetPropertyInfoIndexes: the exact
+#       matches of the leaf node are checked first), so a prefix entry
+#       of our own would never take effect.  Adding an "exact" entry of
+#       our own would abort the whole property context trie
+#       ("Duplicate exact match detected"), which would leave every
+#       property in the system without a type.
+#
+#       The density itself is not lost: device/lge/v521/system.prop sets
+#           ro.sf.lcd_density=320
+#       and init loads build.prop before it runs any of the init
+#       scripts, in the init domain, which is allowed to set any
+#       property type.  The matching setprop in
+#       rootdir/etc/init.qcom.early_boot.sh is therefore a no-op.
+#
+#   ctl.msm_irqbalance
+#       The Pie legacy CAF policy already labels it
+#           u:object_r:msm_irqbalance_prop:s0
+#       (device/qcom/sepolicy-legacy/legacy-common/property_contexts:1),
+#       so a second entry of our own would be a duplicate.

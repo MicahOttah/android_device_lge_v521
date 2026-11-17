@@ -29,9 +29,9 @@
 # and reading the file behind it are two separate permission checks, and
 # the CAF policy only covers the first one:
 #
-#   device/qcom/sepolicy/common/hal_drm.te:32
+#   device/qcom/sepolicy-legacy/common/hal_drm.te:32
 #       allow hal_drm firmware_file:dir  r_dir_perms;
-#   device/qcom/sepolicy/common/hal_drm.te:33
+#   device/qcom/sepolicy-legacy/common/hal_drm.te:33
 #       allow hal_drm firmware_file:file r_file_perms;
 #
 # There is no rule for firmware_file:lnk_file (the symlink) and none at
@@ -53,7 +53,7 @@
 # drmserver (LG shipped Android 7.0, where the CDM was still loaded into
 # the Java DRM service), restricted to what the 8.1 service actually
 # needs.  The tee domain already has the same access (the QSEE daemon
-# reads the same files), see device/qcom/sepolicy/common/qseecomd.te.
+# reads the same files), see device/qcom/sepolicy-legacy/common/qseecomd.te.
 allow hal_drm_default firmware_file:lnk_file { getattr ioctl lock map open read };
 allow hal_drm_default persist_drm_file:dir { getattr ioctl lock open read search };
 allow hal_drm_default persist_drm_file:file { getattr ioctl lock map open read };

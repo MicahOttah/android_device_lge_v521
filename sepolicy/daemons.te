@@ -16,12 +16,13 @@ allow cnd self:capability { chown dac_override fsetid net_raw setgid setuid };
 
 # cnd removes the stale wpa_supplicant control socket before the
 # supplicant binds a new one.  CAF does that with its own wpa_socket
-# type (device/qcom/sepolicy/common/cnd.te:25
+# type (device/qcom/sepolicy-legacy/common/cnd.te:47-50
+#     allow cnd wpa_socket:dir rw_dir_perms;
 #     allow cnd wpa_socket:sock_file { create unlink setattr };),
 # but here the socket is labelled with the *platform* type, because the
 # platform file contexts have
 #   /data/misc/wifi/sockets/wpa_ctrl.*   u:object_r:system_wpa_socket:s0
-# (system/sepolicy/private/file_contexts:386).
+# (system/sepolicy/private/file_contexts).
 #
 # "unlink" is the only permission that is missing; the permission to
 # remove the name from the directory (remove_name on wpa_socket:dir) is
@@ -72,13 +73,31 @@ allow thermal-engine sysfs_spmi_dev:dir r_dir_perms;
 allow thermal-engine sysfs_spmi_dev:lnk_file r_file_perms;
 
 # --- netmgrd -------------------------------------------------------------
-# netmgrd hands the network interface over to netd and keeps the
-# interface list in /data/misc/net.
+# NOT PART OF THE BUILD (Android 9 / Pie).
 #
-# Only "write" on the netd socket, not w_file_perms: "append" is
-# forbidden for vendor domains on coredomain sockets.
-allow netmgrd netd_socket:sock_file write;
-r_dir_file(netmgrd, net_data_file);
+# Android 9 merged netmgrd into the platform netd (system/netd): the
+# traffic controller, the firewall controller and the interface controller
+# are all part of netd now, and the platform has no netmgrd domain
+# anymore.  The CAF netmgrd blob of this device (vendor/lge/v521/
+# proprietary/bin/netmgrd) is the old "data network" manager: it is a UNIX
+# server on /dev/socket/netmgr/netmgr_connect_socket, and nothing in
+# Android 9 talks to it - the Pie radio (hardware/ril-caf) has no netmgr
+# code at all, and the platform netd does not provide that socket.
+#
+# So the blob is not installed any more (see v521-vendor.mk), the init
+# service is gone (init.qcom.rc) and the domain does not exist.  The
+# network is handled by the platform netd.
+#
+# The rules that were here in the 15.1 port:
+#
+#   allow netmgrd netd_socket:sock_file write;
+#   r_dir_file(netmgrd, net_data_file);
+#
+# and the "vendor_executes_system_violators" exception for the CAF
+# libdsutils.so, which runs /system/bin/ifconfig:
+#
+#   typeattribute netmgrd vendor_executes_system_violators;
+#   allow netmgrd toolbox_exec:file rx_file_perms;
 
 # --- mm-qcamerad ---------------------------------------------------------
 # The camera HAL creates and removes its own socket below /data/misc.
@@ -88,27 +107,44 @@ allow mm-qcamerad sysfs:file r_file_perms;
 # The socket itself is labelled camera_socket (the file_contexts entry for
 # /data/misc/camera/cam_socket[1-2]), so the daemon has to be able to
 # remove the socket that was left behind by the previous boot before it
-# can bind its own.  CAF keeps this rule and the matching type transition
-# in its legacy policy, which is not part of this build
-#   device/qcom/sepolicy/legacy-common/mm-qcamerad.te:3-4
-type_transition mm-qcamerad system_data_file:sock_file camera_socket "cam_socket1";
-type_transition mm-qcamerad system_data_file:sock_file camera_socket "cam_socket2";
-allow mm-qcamerad camera_socket:sock_file { create setattr unlink write };
+# can bind its own.  The Pie legacy CAF policy keeps this rule and the
+# matching type transition in its legacy policy, which IS part of this
+# build:
+#   device/qcom/sepolicy-legacy/legacy-common/mm-qcamerad.te:3-5
+#     type_transition mm-qcamerad system_data_file:sock_file camera_socket "cam_socket1";
+#     type_transition mm-qcamerad system_data_file:sock_file camera_socket "cam_socket2";
+#     allow mm-qcamerad camera_socket:sock_file { create unlink write };
+#
+# The two rules above are kept for the record; duplicate allow rules and
+# duplicate type transitions are merged by checkpolicy and are not an
+# error.
 
 # --- rmt_storage ---------------------------------------------------------
 # rmt_storage writes to the remoteproc shared memory entry
 # /sys/kernel/debug/rmt_storage/rmts.  The entry carries its own label
-# (debugfs_rmt, see sepolicy/file.te and sepolicy/genfs_contexts)
-# because AOSP forbids writing to the generic debugfs label:
+# (debugfs_rmt) because AOSP forbids writing to the generic debugfs
+# label:
 #   neverallow { domain -init -system_server -dumpstate } debugfs:file no_rw_file_perms;
+#
+# The type, the genfscon and the rules for the daemon come from the Pie
+# legacy CAF policy (device/qcom/sepolicy-legacy/legacy-common/
+# file.te:1, genfs_contexts:1 and rmt_storage.te:5-6).  The two rules
+# below are kept because they are narrower than the ones of the legacy
+# policy (write only, not read/write); duplicate allow rules are fine.
 allow rmt_storage debugfs_rmt:dir search;
 allow rmt_storage debugfs_rmt:file w_file_perms;
 
 # --- rild ----------------------------------------------------------------
 # rild keeps its modem configuration and the ICCID files in
 # /data/misc/radio and creates the sqlite journal (qcril.db-journal)
-# next to them, so it needs the CAF rules for the radio data directory.
-#   device/qcom/sepolicy/common/rild.te:42-43
+# next to them.  The Pie legacy CAF policy only covers the *vendor* copy
+# of that directory:
+#   device/qcom/sepolicy-legacy/common/file_contexts:552
+#       /data/misc/radio(/.*)?   u:object_r:radio_data_file:s0
+#   device/qcom/sepolicy-legacy/common/rild.te:42-43
+#       allow rild vendor_radio_data_file:dir rw_dir_perms;
+#       allow rild vendor_radio_data_file:file create_file_perms;
+# so the rules for /data/misc/radio are still needed here.
 allow rild radio_data_file:dir rw_dir_perms;
 allow rild radio_data_file:file create_file_perms;
 
@@ -121,15 +157,23 @@ binder_use(rild)
 # --- ipacm ---------------------------------------------------------------
 # The CAF policy expects the IPA configuration in /data/vendor/ipa, which
 # carries the ipa_vendor_data_file label
-#   device/qcom/sepolicy/common/file_contexts:530
-#   device/qcom/sepolicy/common/ipacm.te:33-34
+#   device/qcom/sepolicy-legacy/common/file_contexts:533
+#   device/qcom/sepolicy-legacy/common/ipacm.te:33-34
 # This device keeps it in /data/misc/ipa instead.  The directory is
 # created by init ("mkdir /data/misc/ipa 0700 net_admin net_admin" in
 # init.qcom.rc), and init's make_dir() looks the context up in
 # file_contexts and calls setfscreatecon() before the mkdir(), so the
-# directory gets the ipa_vendor_data_file label from
-# sepolicy/file_contexts.  The pid file inside it inherits the label of
-# the directory, and CAF's ipacm rules then cover it.
+# directory gets its label from the file contexts.  The pid file inside
+# it inherits the label of the directory, and the ipacm rules then cover
+# it.
+#
+# The label of /data/misc/ipa comes from the Pie legacy CAF policy,
+# which uses ipacm_data_file for it:
+#   device/qcom/sepolicy-legacy/legacy-common/file_contexts:20
+#       /data/misc/ipa(/.*)?   u:object_r:ipacm_data_file:s0
+#   device/qcom/sepolicy-legacy/legacy-common/ipacm.te:4-5
+#       allow ipacm ipacm_data_file:dir w_dir_perms;
+#       allow ipacm ipacm_data_file:file create_file_perms;
 #
 # The directory must not stay on the generic system_data_file label:
 #   neverallow { domain -system_server -system_app -init -installd
@@ -144,21 +188,11 @@ binder_use(rild)
 type_transition thermal-engine socket_device:sock_file thermal_socket;
 
 # --- netmgrd -------------------------------------------------------------
-# CAF's libdsutils.so runs the absolute path /system/bin/ifconfig.  On
-# this device /system/bin/ifconfig is the symlink to the AOSP toybox
-# (toolbox_exec); CAF expects the vendor toybox (vendor_toolbox_exec),
-# which netmgrd is allowed to execute (common/netmgrd.te:86).
-#
-# The AOSP escape hatch for vendor domains that execute platform files
-# is used here.  It only lifts the neverallow
-#   neverallow { domain -coredomain -appdomain -rild
-#                -vendor_executes_system_violators }
-#              { exec_type -vendor_file_type ... }:file { entrypoint execute execute_no_trans };
-# for this one domain; rx_file_perms contains no write permission, so
-# the "only recovery may write to /system and /vendor" neverallow is not
-# affected.
-typeattribute netmgrd vendor_executes_system_violators;
-allow netmgrd toolbox_exec:file rx_file_perms;
+# NOT PART OF THE BUILD - see the note at the top of this file.  The CAF
+# libdsutils.so of the old netmgrd ran the absolute path
+# /system/bin/ifconfig, which is the symlink to the AOSP toybox
+# (toolbox_exec) on this device.  With the netmgrd gone, no vendor domain
+# needs the "vendor_executes_system_violators" exception any more.
 
 # --- per_mgr / qseeproxy -------------------------------------------------
 # Both daemons register their service with the legacy servicemanager.

@@ -32,7 +32,10 @@
 baseband=`getprop ro.baseband`
 sgltecsfb=`getprop persist.radio.sglte_csfb`
 datamode=`getprop persist.data.mode`
-netmgr=`getprop ro.use_data_netmgrd`
+# NOTE: there is no "netmgr" variable any more.  Android 9 merged netmgrd
+# into the platform netd (system/netd), the CAF netmgrd blob is not
+# installed any more and the Pie radio (hardware/ril-caf) does not talk to
+# it - see device/lge/v521/sepolicy/daemons.te.
 
 case "$baseband" in
     "apq")
@@ -72,14 +75,6 @@ case "$baseband" in
             ;;
         "concurrent")
             start qti
-            if [ "$netmgr" = "true" ]; then
-                start netmgrd
-            fi
-            ;;
-        *)
-            if [ "$netmgr" = "true" ]; then
-                start netmgrd
-            fi
             ;;
     esac
 esac

@@ -462,10 +462,30 @@ service cnd /system/bin/cnd
     class main
     socket cnd stream 660 root inet
 
+# The Qualcomm DPM daemon (Fast Dormancy / CTM / TCM) is installed - the
+# native half of it, the Java side has no driver on this device - but it is
+# NOT started.
+#
+# 15.1 ran it with persist.dpm.feature=11 (FD | CTM | TCM).  Two things broke
+# that in Android 9:
+#
+#   * netmgrd is gone.  Pie merged the data connection handling into the
+#     platform netd (system/netd) and the CAF netmgrd blob is not installed
+#     any more.  Fast Dormancy installs its per-UID filter rules through the
+#     rmnet data socket (RMNET_IOCTL_EXTENDED), and that socket belongs to
+#     the data connection service - so the FD half has no driver.
+#   * persist.dpm.feature is not set, so dpmd would abort one second into
+#     the boot ("None of the dpm feature enabled, dpmd shutting down") and
+#     init would restart it, over and over.
+#
+# The blobs and their SELinux rules stay in the tree, so the feature can be
+# switched back on ("setprop persist.dpm.feature 11" plus "start dpmd") once
+# the data path is understood.  See notes/2026-11-16-dpm-nsrm.md.
 service dpmd /system/bin/dpmd
     class late_start
     socket dpmd stream 660 root system
     group system readproc
+    disabled
 
 service irsc_util /system/bin/irsc_util "/etc/sec_config"
     class main
@@ -584,10 +604,6 @@ service qmuxd /system/bin/qmuxd
     group radio audio bluetooth gps nfc oem_2950
     disabled
 
-service netmgrd /system/bin/netmgrd
-    class main
-    disabled
-
 service ipacm-diag /system/bin/ipacm-diag
     class main
     user system
@@ -612,10 +628,6 @@ service sensors /system/bin/sensors.qcom
     user root
     group root
     disabled
-
-on property:ro.use_data_netmgrd=false
-    # netmgr not supported on specific target
-    stop netmgrd
 
 # Adjust socket buffer to enlarge TCP receive window for high bandwidth
 # but only if ro.data.large_tcp_window_size property is set.

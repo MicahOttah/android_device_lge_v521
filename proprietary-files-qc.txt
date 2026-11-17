@@ -57,14 +57,13 @@ vendor/lib/libxml.so
 # therefore has no driver, but dpmd still does the Fast Dormancy half of
 # the feature, which is driven by etc/dpm/dpm.conf alone.
 # See notes/2026-11-16-dpm-nsrm.md.
+#
+# The Java side of the feature (the dpmframework and dpmapi jars, the
+# tcmclient jar and the two permission files that pull them in) is not
+# installed: Pie's radio has no DPM API for it to talk to.
 bin/dpmd
 etc/dpm/dpm.conf
 etc/dpm/nsrm/NsrmConfiguration.xml
-etc/permissions/com.qti.dpmframework.xml
-etc/permissions/dpmapi.xml
-framework/com.qti.dpmframework.jar
-framework/dpmapi.jar
-framework/tcmclient.jar
 vendor/lib/libdpmctmgr.so
 vendor/lib/libdpmfdmgr.so
 vendor/lib/libdpmframework.so
@@ -88,6 +87,9 @@ vendor/lib/libsecureui_svcsock.so
 vendor/lib/libsecureuisvc_jni.so
 vendor/lib/libssd.so
 vendor/lib/libStDrvInt.so
+# The OEM crypto library.  The CAF Widevine CDM needs it to reach the TEE.
+# See notes/2026-11-16-widevine.md.
+vendor/lib/liboemcrypto.so
 
 # Gatekeeper
 vendor/lib/hw/gatekeeper.msm8952.so
@@ -214,7 +216,6 @@ vendor/lib/libsmemlog.so
 
 # Radio
 bin/ipacm-diag
-bin/netmgrd
 bin/qmuxd
 bin/radish
 bin/rmt_storage
