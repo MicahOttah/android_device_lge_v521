@@ -35,8 +35,13 @@
 # in build.prop through ADDITIONAL_BUILD_PROPERTIES
 # (build/make/core/main.mk:124).  ADDITIONAL_BUILD_PROPERTIES itself cannot
 # be used from here - build/core/main.mk:112 refuses a tree that sets it.
+#
+# The message has to go to stderr: Android 9 reads the output of the
+# variable dump and fails on every line that is not "NAME=VALUE"
+# (build/soong/ui/build/dumpvars.go:80), and a message on stdout would
+# break every "breakfast" in the tree.
 ifeq ($(V521_BUILD_ATTEMPT),)
-    $(info v521: no build revision - build through bin/build to get one)
+    $(warning v521: no build revision - build through bin/build to get one)
 else
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.v521.build.attempt=$(V521_BUILD_ATTEMPT) \
